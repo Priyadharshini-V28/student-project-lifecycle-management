@@ -6,6 +6,7 @@ import { env } from './config/env';
 import { logger } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import healthRoutes from './routes/health.routes';
+import authRoutes from './routes/auth.routes';
 
 export const createApp = (): Application => {
   const app = express();
@@ -36,6 +37,7 @@ export const createApp = (): Application => {
 
   // Mount API routes
   app.use('/api', healthRoutes);
+  app.use('/api/auth', authRoutes);
 
   // Fallback for unmatched routes
   app.use(notFoundHandler);

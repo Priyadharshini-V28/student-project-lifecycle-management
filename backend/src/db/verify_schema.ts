@@ -14,7 +14,7 @@ export const runSchemaVerification = async (): Promise<void> => {
   // Register pgcrypto and gen_random_uuid
   memDb.public.registerFunction({
     name: 'gen_random_uuid',
-    returns: memDb.public.getType('uuid'),
+    returns: (memDb.public as unknown as { getType: (t: string) => unknown }).getType('uuid') as never,
     implementation: () => '11111111-2222-3333-4444-555555555555',
   });
 

@@ -5,12 +5,13 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only --exit-child src/server.ts",
-    "build": "rimraf dist && tsc",
+    "build": "rimraf dist && tsc && node -e \"const fs = require('fs'); fs.mkdirSync('dist/db/migrations', { recursive: true }); fs.copyFileSync('src/db/migrations/001_create_tables.sql', 'dist/db/migrations/001_create_tables.sql'); fs.copyFileSync('src/db/migrations/002_seed_data.sql', 'dist/db/migrations/002_seed_data.sql');\"",
     "start": "node dist/server.js",
     "db:migrate": "ts-node-dev --transpile-only src/db/migrate.ts",
     "db:seed": "ts-node-dev --transpile-only src/db/seed.ts",
     "db:setup": "ts-node-dev --transpile-only src/db/migrate.ts && ts-node-dev --transpile-only src/db/seed.ts",
     "db:verify": "ts-node-dev --transpile-only src/db/verify_schema.ts",
+    "test:auth": "ts-node-dev --transpile-only src/db/test_auth.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

@@ -35,19 +35,19 @@ INSERT INTO academic_batches (id, department_id, name, start_year, end_year, is_
 -- ----------------------------------------------------------------------------
 -- Admin (a0000000...)
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, department_id) VALUES
-('a0000000-0000-0000-0000-000000000001', 'admin@splm.edu', '$2a$10$w4RsmJmK6Pq67r1004hQ9e8.jU.X7Fm/75qgU28J16rV4v9p9sS.C', 'Dr. Aruna', 'Devi', 'ADMIN', 1);
+('a0000000-0000-0000-0000-000000000001', 'admin@splm.edu', '$2a$10$imEZT27g5odn4W5j9Et/g.hqZhyjq/NskZHGAVMsJ4xZQEIm9lqdS', 'Dr. Aruna', 'Devi', 'ADMIN', 1);
 
 -- Faculty (f0000000...)
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, department_id) VALUES
-('f0000000-0000-0000-0000-000000000001', 'faculty1@splm.edu', '$2a$10$w4RsmJmK6Pq67r1004hQ9e8.jU.X7Fm/75qgU28J16rV4v9p9sS.C', 'Dr. Rajesh', 'Kumar', 'FACULTY', 1),
-('f0000000-0000-0000-0000-000000000002', 'faculty2@splm.edu', '$2a$10$w4RsmJmK6Pq67r1004hQ9e8.jU.X7Fm/75qgU28J16rV4v9p9sS.C', 'Dr. Meenakshi', 'Sundaram', 'FACULTY', 1);
+('f0000000-0000-0000-0000-000000000001', 'faculty1@splm.edu', '$2a$10$imEZT27g5odn4W5j9Et/g.hqZhyjq/NskZHGAVMsJ4xZQEIm9lqdS', 'Dr. Rajesh', 'Kumar', 'FACULTY', 1),
+('f0000000-0000-0000-0000-000000000002', 'faculty2@splm.edu', '$2a$10$imEZT27g5odn4W5j9Et/g.hqZhyjq/NskZHGAVMsJ4xZQEIm9lqdS', 'Dr. Meenakshi', 'Sundaram', 'FACULTY', 1);
 
 -- Students (b0000000...)
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, department_id) VALUES
-('b0000000-0000-0000-0000-000000000001', 'student1@splm.edu', '$2a$10$w4RsmJmK6Pq67r1004hQ9e8.jU.X7Fm/75qgU28J16rV4v9p9sS.C', 'Rahul', 'Sharma', 'STUDENT', 1),
-('b0000000-0000-0000-0000-000000000002', 'student2@splm.edu', '$2a$10$w4RsmJmK6Pq67r1004hQ9e8.jU.X7Fm/75qgU28J16rV4v9p9sS.C', 'Ananya', 'Verma', 'STUDENT', 1),
-('b0000000-0000-0000-0000-000000000003', 'student3@splm.edu', '$2a$10$w4RsmJmK6Pq67r1004hQ9e8.jU.X7Fm/75qgU28J16rV4v9p9sS.C', 'Vikram', 'Patel', 'STUDENT', 1),
-('b0000000-0000-0000-0000-000000000004', 'student4@splm.edu', '$2a$10$w4RsmJmK6Pq67r1004hQ9e8.jU.X7Fm/75qgU28J16rV4v9p9sS.C', 'Sneha', 'Iyer', 'STUDENT', 1);
+('b0000000-0000-0000-0000-000000000001', 'student1@splm.edu', '$2a$10$imEZT27g5odn4W5j9Et/g.hqZhyjq/NskZHGAVMsJ4xZQEIm9lqdS', 'Rahul', 'Sharma', 'STUDENT', 1),
+('b0000000-0000-0000-0000-000000000002', 'student2@splm.edu', '$2a$10$imEZT27g5odn4W5j9Et/g.hqZhyjq/NskZHGAVMsJ4xZQEIm9lqdS', 'Ananya', 'Verma', 'STUDENT', 1),
+('b0000000-0000-0000-0000-000000000003', 'student3@splm.edu', '$2a$10$imEZT27g5odn4W5j9Et/g.hqZhyjq/NskZHGAVMsJ4xZQEIm9lqdS', 'Vikram', 'Patel', 'STUDENT', 1),
+('b0000000-0000-0000-0000-000000000004', 'student4@splm.edu', '$2a$10$imEZT27g5odn4W5j9Et/g.hqZhyjq/NskZHGAVMsJ4xZQEIm9lqdS', 'Sneha', 'Iyer', 'STUDENT', 1);
 
 -- ----------------------------------------------------------------------------
 -- 5. SEED FACULTY DETAILS

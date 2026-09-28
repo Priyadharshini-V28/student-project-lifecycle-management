@@ -17,6 +17,15 @@ export interface User {
   departmentId?: number;
   departmentCode?: string;
   departmentName?: string;
+  profile?: {
+    rollNumber?: string;
+    semester?: number;
+    cgpa?: number;
+    batchName?: string;
+    employeeId?: string;
+    designation?: string;
+    specialization?: string;
+  };
 }
 
 export interface HealthCheckData {
