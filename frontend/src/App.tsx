@@ -5,7 +5,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { StudentDashboard } from './pages/StudentDashboard';
-import { FacultyDashboardPreview } from './pages/FacultyDashboardPreview';
+import { FacultyDashboard } from './pages/FacultyDashboard';
 import { AdminDashboardPreview } from './pages/AdminDashboardPreview';
 import { ProfilePage } from './pages/ProfilePage';
 
@@ -59,7 +59,7 @@ export const App: React.FC = () => {
             path="/faculty/dashboard"
             element={
               <ProtectedRoute allowedRoles={['FACULTY']}>
-                <FacultyDashboardPreview />
+                <FacultyDashboard />
               </ProtectedRoute>
             }
           />

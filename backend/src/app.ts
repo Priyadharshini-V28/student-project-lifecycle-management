@@ -9,6 +9,7 @@ import healthRoutes from './routes/health.routes';
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import studentRoutes from './routes/student.routes';
+import facultyRoutes from './routes/faculty.routes';
 
 export const createApp = (): Application => {
   const app = express();
@@ -42,6 +43,7 @@ export const createApp = (): Application => {
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/students', studentRoutes);
+  app.use('/api/faculty', facultyRoutes);
 
   // Fallback for unmatched routes
   app.use(notFoundHandler);

@@ -167,4 +167,106 @@ export interface StudentDashboardData {
   proposals: ProposalDto[];
 }
 
+export interface FacultyPendingReviewItem {
+  projectId: string;
+  projectTitle: string;
+  domain: string;
+  status: string;
+  studentLead: string;
+  rollNumber: string;
+  activeMilestoneNumber: number | null;
+  activeMilestoneTitle: string | null;
+  milestoneDueDate: string | null;
+}
+
+export interface FacultyPendingResubmissionItem {
+  resubmissionId: string;
+  reviewId: string;
+  projectId: string;
+  projectTitle: string;
+  studentLead: string;
+  rollNumber: string;
+  roundNumber: number;
+  studentNotes: string;
+  resubmittedAt: string;
+  originalRequiredChanges: string | null;
+}
+
+export interface FacultyPendingProposalItem {
+  proposalId: string;
+  title: string;
+  domain: string;
+  submittedByName: string;
+  submittedByRoll: string;
+  status: string;
+  version: number;
+  academicYear: string;
+  createdAt: string;
+}
+
+export interface FacultyAssignedProject {
+  id: string;
+  title: string;
+  abstract: string;
+  domain: string;
+  status: string;
+  overallProgress: number;
+  repositoryUrl: string | null;
+  createdAt: string;
+  studentLead: {
+    id: string;
+    name: string;
+    email: string;
+    rollNumber: string;
+  };
+  teamMembersCount: number;
+  currentMilestone: {
+    milestoneNumber: number;
+    title: string;
+    dueDate: string;
+    status: string;
+    completionPercentage: number;
+    isOverdue: boolean;
+  } | null;
+  latestReview: {
+    roundNumber: number;
+    reviewDate: string;
+    status: string;
+    totalScore: number | null;
+  } | null;
+}
+
+export interface FacultyDashboardMetrics {
+  maxQuota: number;
+  currentlyAssigned: number;
+  remainingCapacity: number;
+  capacityUtilizationPercentage: number;
+  pendingReviewsCount: number;
+  pendingResubmissionsCount: number;
+  proposalsAwaitingReviewCount: number;
+  evaluatedProjectsCount: number;
+}
+
+export interface FacultyDashboardData {
+  faculty: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    employeeId: string;
+    designation: string;
+    specialization: string;
+    departmentCode: string;
+    departmentName: string;
+  };
+  metrics: FacultyDashboardMetrics;
+  actionQueues: {
+    pendingReviews: FacultyPendingReviewItem[];
+    pendingResubmissions: FacultyPendingResubmissionItem[];
+    pendingProposals: FacultyPendingProposalItem[];
+  };
+  assignedProjects: FacultyAssignedProject[];
+}
+
+
 
