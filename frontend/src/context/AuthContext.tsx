@@ -10,6 +10,7 @@ interface AuthContextType {
   register: (payload: Record<string, unknown>) => Promise<User>;
   logout: () => Promise<void>;
   checkSession: () => Promise<void>;
+  updateUserState: (updatedUser: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -96,6 +97,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const updateUserState = (updatedUser: User) => {
+    setUser(updatedUser);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -106,6 +111,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         register,
         logout,
         checkSession,
+        updateUserState,
       }}
     >
       {children}

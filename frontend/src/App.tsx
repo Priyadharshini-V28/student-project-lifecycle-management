@@ -7,6 +7,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { StudentDashboardPreview } from './pages/StudentDashboardPreview';
 import { FacultyDashboardPreview } from './pages/FacultyDashboardPreview';
 import { AdminDashboardPreview } from './pages/AdminDashboardPreview';
+import { ProfilePage } from './pages/ProfilePage';
 
 // Root redirector based on authenticated role
 const RootRedirect: React.FC = () => {
@@ -69,6 +70,16 @@ export const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
                 <AdminDashboardPreview />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Protected Profile Route (All Roles) */}
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute allowedRoles={['STUDENT', 'FACULTY', 'ADMIN']}>
+                <ProfilePage />
               </ProtectedRoute>
             }
           />

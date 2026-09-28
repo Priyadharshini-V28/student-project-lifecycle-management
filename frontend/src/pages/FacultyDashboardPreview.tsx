@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
   LogOut, 
@@ -9,6 +10,7 @@ import {
 
 export const FacultyDashboardPreview: React.FC = () => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -38,6 +40,15 @@ export const FacultyDashboardPreview: React.FC = () => {
             <span className="px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs font-bold uppercase tracking-wider">
               {user?.role}
             </span>
+
+            <button
+              onClick={() => navigate('/profile')}
+              className="inline-flex items-center space-x-1 px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+              title="View & Edit Profile"
+            >
+              <User className="w-3.5 h-3.5 text-slate-500" />
+              <span>Profile</span>
+            </button>
 
             <button
               onClick={logout}

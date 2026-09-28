@@ -34,3 +34,30 @@ export interface HealthCheckData {
   environment: string;
   version: string;
 }
+
+export interface ProjectSummary {
+  projectId: string;
+  title: string;
+  domain: string;
+  status: string;
+  progress: number;
+  roleInProject?: string;
+  facultyGuide?: string;
+  studentLead?: string;
+  allocatedAt?: string;
+}
+
+export interface StudentAcademicProfile extends User {
+  activeProjectCount: number;
+  projects: ProjectSummary[];
+}
+
+export interface FacultyAcademicProfile extends User {
+  activeProjectCount: number;
+  maxQuota: number;
+  currentlyAssigned: number;
+  remainingCapacity: number;
+  pendingReviewsCount: number;
+  assignedProjects: ProjectSummary[];
+}
+

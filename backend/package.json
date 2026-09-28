@@ -12,6 +12,7 @@
     "db:setup": "ts-node-dev --transpile-only src/db/migrate.ts && ts-node-dev --transpile-only src/db/seed.ts",
     "db:verify": "ts-node-dev --transpile-only src/db/verify_schema.ts",
     "test:auth": "ts-node-dev --transpile-only src/db/test_auth.ts",
+    "test:profile": "ts-node-dev --transpile-only src/db/test_profile.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
