@@ -1,0 +1,27 @@
+export interface ApiResponse<T = unknown> {
+  success: boolean;
+  message: string;
+  data?: T;
+  errors?: Array<{ field?: string; message: string }>;
+  timestamp: string;
+}
+
+export type UserRole = 'STUDENT' | 'FACULTY' | 'ADMIN';
+
+export interface User {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  departmentId?: number;
+  departmentCode?: string;
+  departmentName?: string;
+}
+
+export interface HealthCheckData {
+  uptimeSeconds: number;
+  timestamp: string;
+  environment: string;
+  version: string;
+}
