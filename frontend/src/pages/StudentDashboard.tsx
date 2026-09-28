@@ -16,8 +16,10 @@ import {
   Award,
   RefreshCw,
   FileText,
-  UserCheck
+  UserCheck,
+  Plus
 } from 'lucide-react';
+import { CreateProposalModal } from '../components/CreateProposalModal';
 
 export const StudentDashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -26,6 +28,7 @@ export const StudentDashboard: React.FC = () => {
   const [dashboard, setDashboard] = useState<StudentDashboardData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string>('');
+  const [isCreateProposalOpen, setIsCreateProposalOpen] = useState<boolean>(false);
 
   const fetchDashboardData = async () => {
     setIsLoading(true);
@@ -501,10 +504,17 @@ export const StudentDashboard: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <FileText className="w-5 h-5 text-sky-600" />
                   <h3 className="text-base font-bold text-slate-900">Project Proposals History</h3>
+                  <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                    {dashboard.proposals.length} Submitted
+                  </span>
                 </div>
-                <span className="text-xs text-slate-500 font-semibold">
-                  {dashboard.proposals.length} Submitted
-                </span>
+                <button
+                  onClick={() => setIsCreateProposalOpen(true)}
+                  className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Submit Proposal</span>
+                </button>
               </div>
 
               <div className="space-y-3">
@@ -523,6 +533,13 @@ export const StudentDashboard: React.FC = () => {
                 ))}
               </div>
             </div>
+
+            {/* Create Proposal Modal */}
+            <CreateProposalModal
+              isOpen={isCreateProposalOpen}
+              onClose={() => setIsCreateProposalOpen(false)}
+              onSuccess={() => fetchDashboardData()}
+            />
           </>
         )}
       </main>

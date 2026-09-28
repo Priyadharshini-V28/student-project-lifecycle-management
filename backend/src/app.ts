@@ -10,6 +10,8 @@ import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import studentRoutes from './routes/student.routes';
 import facultyRoutes from './routes/faculty.routes';
+import proposalRoutes from './routes/proposal.routes';
+import projectRoutes from './routes/project.routes';
 
 export const createApp = (): Application => {
   const app = express();
@@ -44,6 +46,8 @@ export const createApp = (): Application => {
   app.use('/api/users', userRoutes);
   app.use('/api/students', studentRoutes);
   app.use('/api/faculty', facultyRoutes);
+  app.use('/api/proposals', proposalRoutes);
+  app.use('/api/projects', projectRoutes);
 
   // Fallback for unmatched routes
   app.use(notFoundHandler);

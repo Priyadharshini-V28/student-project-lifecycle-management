@@ -268,5 +268,76 @@ export interface FacultyDashboardData {
   assignedProjects: FacultyAssignedProject[];
 }
 
+export interface SystemSettingsDto {
+  maxTeamSize: number;
+  minTeamSize: number;
+  allowStudentProposals: boolean;
+}
+
+export interface ProposalMemberItem {
+  id: number;
+  studentId: string;
+  name: string;
+  email: string;
+  rollNumber: string;
+  semester: number;
+  status: 'INVITED' | 'ACCEPTED' | 'DECLINED';
+  isLead: boolean;
+  joinedAt: string;
+}
+
+export interface ProposalDetailDto {
+  id: string;
+  title: string;
+  abstract: string;
+  domain: string;
+  techStack: string[];
+  submittedBy: {
+    id: string;
+    name: string;
+    email: string;
+    rollNumber: string;
+    departmentCode: string;
+  };
+  assignedFaculty: {
+    id: string;
+    name: string;
+    email: string;
+    designation: string;
+    departmentCode: string;
+  } | null;
+  status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED' | 'REJECTED';
+  facultyComments: string | null;
+  version: number;
+  academicYear: string;
+  createdAt: string;
+  updatedAt: string;
+  members: ProposalMemberItem[];
+  projectId: string | null;
+}
+
+export interface CreateProposalInput {
+  title: string;
+  abstract: string;
+  domain: string;
+  techStack: string[];
+  assignedFacultyId?: string | null;
+  initialStatus?: 'DRAFT' | 'SUBMITTED';
+  coMemberStudentIds?: string[];
+}
+
+export interface UpdateProposalInput {
+  title?: string;
+  abstract?: string;
+  domain?: string;
+  techStack?: string[];
+  assignedFacultyId?: string | null;
+}
+
+export interface ReviewProposalInput {
+  status: 'APPROVED' | 'CHANGES_REQUESTED' | 'REJECTED';
+  facultyComments: string;
+}
+
 
 

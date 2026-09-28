@@ -16,6 +16,7 @@ import {
   Users,
   FolderGit2
 } from 'lucide-react';
+import { ProposalAppraisalModal } from '../components/ProposalAppraisalModal';
 
 export const FacultyDashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -25,6 +26,8 @@ export const FacultyDashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [activeQueueTab, setActiveQueueTab] = useState<'reviews' | 'resubmissions' | 'proposals'>('reviews');
+  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
+  const [isAppraisalOpen, setIsAppraisalOpen] = useState<boolean>(false);
 
   const fetchDashboardData = async () => {
     setIsLoading(true);
@@ -409,7 +412,13 @@ export const FacultyDashboard: React.FC = () => {
                               Academic Year: {prop.academicYear} &bull; Submitted: {prop.createdAt.substring(0, 10)}
                             </div>
                           </div>
-                          <button className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg transition shrink-0">
+                          <button
+                            onClick={() => {
+                              setSelectedProposalId(prop.proposalId);
+                              setIsAppraisalOpen(true);
+                            }}
+                            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-xs transition shrink-0"
+                          >
                             Appraise Proposal
                           </button>
                         </div>
@@ -532,6 +541,17 @@ export const FacultyDashboard: React.FC = () => {
                 ))}
               </div>
             </div>
+
+            {/* Proposal Appraisal Modal */}
+            <ProposalAppraisalModal
+              proposalId={selectedProposalId}
+              isOpen={isAppraisalOpen}
+              onClose={() => {
+                setIsAppraisalOpen(false);
+                setSelectedProposalId(null);
+              }}
+              onAppraisalCompleted={() => fetchDashboardData()}
+            />
           </>
         )}
       </main>

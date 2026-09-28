@@ -1,6 +1,7 @@
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { newDb } from 'pg-mem';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
@@ -46,14 +47,9 @@ const getMemDbPool = (): Pool => {
     // Register gen_random_uuid
     memDb.public.registerFunction({
       name: 'gen_random_uuid',
+      impure: true,
       returns: (memDb.public as unknown as { getType: (t: string) => unknown }).getType('uuid') as never,
-      implementation: () => {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-          const r = (Math.random() * 16) | 0;
-          const v = c === 'x' ? r : (r & 0x3) | 0x8;
-          return v.toString(16);
-        });
-      },
+      implementation: () => crypto.randomUUID(),
     });
 
     try {
