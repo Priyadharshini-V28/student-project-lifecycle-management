@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
-import { StudentDashboardPreview } from './pages/StudentDashboardPreview';
+import { StudentDashboard } from './pages/StudentDashboard';
 import { FacultyDashboardPreview } from './pages/FacultyDashboardPreview';
 import { AdminDashboardPreview } from './pages/AdminDashboardPreview';
 import { ProfilePage } from './pages/ProfilePage';
@@ -49,7 +49,7 @@ export const App: React.FC = () => {
             path="/student/dashboard"
             element={
               <ProtectedRoute allowedRoles={['STUDENT']}>
-                <StudentDashboardPreview />
+                <StudentDashboard />
               </ProtectedRoute>
             }
           />
