@@ -1,13 +1,14 @@
 import bcrypt from 'bcryptjs';
-import { query, transaction } from '../db';
+import { User, Department, AcademicBatch } from '../models';
+import { withMongoTransaction } from '../db/mongo';
 import { redisService } from './redis.service';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import { ApiError } from '../utils/ApiError';
 import { logger } from '../utils/logger';
-import { 
-  AuthTokens, 
-  AuthenticatedUser, 
-  JwtPayload 
+import {
+  AuthTokens,
+  AuthenticatedUser,
+  JwtPayload,
 } from '../types/auth.types';
 import { RegisterInput, LoginInput } from '../validators/auth.validator';
 
@@ -17,78 +18,79 @@ export class AuthService {
    */
   async register(input: RegisterInput): Promise<{ tokens: AuthTokens; user: AuthenticatedUser }> {
     // 1. Verify email uniqueness
-    const existing = await query('SELECT id FROM users WHERE email = $1', [input.email.toLowerCase()]);
-    if (existing.rows.length > 0) {
+    const existing = await User.findOne({ email: input.email.toLowerCase() });
+    if (existing) {
       throw ApiError.conflict('An account with this email already exists');
     }
 
-    // 2. Hash password securely
+    // 2. Validate role-specific unique identifiers
+    if (input.role === 'STUDENT' && input.rollNumber) {
+      const rollCheck = await User.findOne({ 'studentProfile.rollNumber': input.rollNumber });
+      if (rollCheck) {
+        throw ApiError.conflict('Roll number is already registered to another student');
+      }
+    } else if (input.role === 'FACULTY' && input.employeeId) {
+      const empCheck = await User.findOne({ 'facultyProfile.employeeId': input.employeeId });
+      if (empCheck) {
+        throw ApiError.conflict('Employee ID is already registered');
+      }
+    }
+
+    // 3. Hash password securely
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(input.password, salt);
 
-    // 3. Atomically create user and role-specific profile
-    const createdUser = await transaction(async (client) => {
-      // Insert base user
-      const userRes = await client.query(
-        `INSERT INTO users (email, password_hash, first_name, last_name, role, department_id)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id, email, first_name, last_name, role, department_id`,
-        [
-          input.email.toLowerCase(),
-          passwordHash,
-          input.firstName,
-          input.lastName,
-          input.role,
-          input.departmentId,
-        ]
-      );
-      const user = userRes.rows[0];
+    // 4. Atomically create user with embedded role-specific profile
+    const createdUser = await withMongoTransaction(async (session) => {
+      const userDoc = new User({
+        email: input.email.toLowerCase(),
+        passwordHash,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        role: input.role,
+        departmentId: input.departmentId,
+        isActive: true,
+        ...(input.role === 'STUDENT'
+          ? {
+              studentProfile: {
+                batchId: input.batchId,
+                rollNumber: input.rollNumber,
+                semester: input.semester,
+                cgpa: input.cgpa || 0.0,
+              },
+            }
+          : {}),
+        ...(input.role === 'FACULTY'
+          ? {
+              facultyProfile: {
+                employeeId: input.employeeId,
+                designation: input.designation,
+                specialization: input.specialization,
+                maxProjects: 5,
+              },
+            }
+          : {}),
+      });
 
-      // Insert role-specific profile
-      if (input.role === 'STUDENT') {
-        // Verify unique roll number
-        const rollCheck = await client.query('SELECT user_id FROM students WHERE roll_number = $1', [input.rollNumber]);
-        if (rollCheck.rows.length > 0) {
-          throw ApiError.conflict('Roll number is already registered to another student');
-        }
-
-        await client.query(
-          `INSERT INTO students (user_id, batch_id, roll_number, semester, cgpa)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [user.id, input.batchId, input.rollNumber, input.semester, input.cgpa || 0.0]
-        );
-      } else if (input.role === 'FACULTY') {
-        // Verify unique employee ID
-        const empCheck = await client.query('SELECT user_id FROM faculty WHERE employee_id = $1', [input.employeeId]);
-        if (empCheck.rows.length > 0) {
-          throw ApiError.conflict('Employee ID is already registered');
-        }
-
-        await client.query(
-          `INSERT INTO faculty (user_id, employee_id, designation, specialization)
-           VALUES ($1, $2, $3, $4)`,
-          [user.id, input.employeeId, input.designation, input.specialization]
-        );
-      }
-
-      return user;
+      await userDoc.save({ session });
+      return userDoc;
     });
 
-    // 4. Issue Tokens
+    // 5. Issue Tokens
     const payload: JwtPayload = {
       id: createdUser.id,
       email: createdUser.email,
       role: createdUser.role,
-      departmentId: createdUser.department_id,
+      departmentId: createdUser.departmentId,
     };
 
     const accessToken = generateAccessToken(payload);
     const { token: refreshToken, tokenId } = generateRefreshToken(createdUser.id);
 
-    // 5. Store active refresh token in Redis session store
+    // 6. Store active refresh token in Redis session store
     await redisService.saveRefreshToken(createdUser.id, tokenId);
 
-    // 6. Fetch complete profile
+    // 7. Fetch complete profile
     const profile = await this.getCurrentUser(createdUser.id);
 
     logger.info(`User registered successfully: ${createdUser.email} (${createdUser.role})`);
@@ -108,24 +110,18 @@ export class AuthService {
    */
   async login(input: LoginInput): Promise<{ tokens: AuthTokens; user: AuthenticatedUser }> {
     // 1. Fetch user credentials
-    const userRes = await query(
-      `SELECT id, email, password_hash, first_name, last_name, role, department_id, is_active
-       FROM users WHERE email = $1`,
-      [input.email.toLowerCase()]
-    );
+    const user = await User.findOne({ email: input.email.toLowerCase() });
 
-    if (userRes.rows.length === 0) {
+    if (!user) {
       throw ApiError.unauthorized('Invalid email or password');
     }
 
-    const user = userRes.rows[0];
-
-    if (!user.is_active) {
+    if (!user.isActive) {
       throw ApiError.forbidden('Your account has been deactivated by the administrator');
     }
 
     // 2. Validate password hash
-    const isPasswordValid = await bcrypt.compare(input.password, user.password_hash);
+    const isPasswordValid = await bcrypt.compare(input.password, user.passwordHash);
     if (!isPasswordValid) {
       throw ApiError.unauthorized('Invalid email or password');
     }
@@ -135,7 +131,7 @@ export class AuthService {
       id: user.id,
       email: user.email,
       role: user.role,
-      departmentId: user.department_id,
+      departmentId: user.departmentId,
     };
 
     const accessToken = generateAccessToken(payload);
@@ -176,21 +172,17 @@ export class AuthService {
     await redisService.revokeRefreshToken(userId, tokenId);
 
     // Fetch user for current role and permissions
-    const userRes = await query(
-      'SELECT id, email, role, department_id, is_active FROM users WHERE id = $1',
-      [userId]
-    );
+    const user = await User.findById(userId);
 
-    if (userRes.rows.length === 0 || !userRes.rows[0].is_active) {
+    if (!user || !user.isActive) {
       throw ApiError.unauthorized('User not found or account inactive');
     }
 
-    const user = userRes.rows[0];
     const payload: JwtPayload = {
       id: user.id,
       email: user.email,
       role: user.role,
-      departmentId: user.department_id,
+      departmentId: user.departmentId,
     };
 
     const newAccessToken = generateAccessToken(payload);
@@ -227,45 +219,38 @@ export class AuthService {
    * Retrieve full user profile
    */
   async getCurrentUser(userId: string): Promise<AuthenticatedUser> {
-    const userRes = await query(
-      `SELECT 
-        u.id, u.email, u.first_name AS "firstName", u.last_name AS "lastName", 
-        u.role, u.department_id AS "departmentId",
-        d.code AS "departmentCode", d.name AS "departmentName",
-        s.roll_number AS "rollNumber", s.semester, s.cgpa, b.name AS "batchName",
-        f.employee_id AS "employeeId", f.designation, f.specialization
-      FROM users u
-      LEFT JOIN departments d ON u.department_id = d.id
-      LEFT JOIN students s ON u.id = s.user_id
-      LEFT JOIN academic_batches b ON s.batch_id = b.id
-      LEFT JOIN faculty f ON u.id = f.user_id
-      WHERE u.id = $1`,
-      [userId]
-    );
+    const user = await User.findById(userId);
 
-    if (userRes.rows.length === 0) {
+    if (!user) {
       throw ApiError.notFound('User profile not found');
     }
 
-    const row = userRes.rows[0];
+    // Look up department and batch
+    const dept = user.departmentId ? await Department.findById(user.departmentId) : null;
+    let batchName: string | undefined;
+
+    if (user.role === 'STUDENT' && user.studentProfile?.batchId) {
+      const batch = await AcademicBatch.findById(user.studentProfile.batchId);
+      batchName = batch?.name;
+    }
 
     return {
-      id: row.id,
-      email: row.email,
-      firstName: row.firstName,
-      lastName: row.lastName,
-      role: row.role,
-      departmentId: row.departmentId,
-      departmentCode: row.departmentCode,
-      departmentName: row.departmentName,
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      departmentId: user.departmentId,
+      departmentCode: dept?.code || 'AIDS',
+      departmentName: dept?.name || 'Department of Artificial Intelligence & Data Science',
       profile: {
-        rollNumber: row.rollNumber,
-        semester: row.semester,
-        cgpa: row.cgpa ? parseFloat(row.cgpa) : undefined,
-        batchName: row.batchName,
-        employeeId: row.employeeId,
-        designation: row.designation,
-        specialization: row.specialization,
+        rollNumber: user.studentProfile?.rollNumber,
+        semester: user.studentProfile?.semester,
+        cgpa: user.studentProfile?.cgpa !== undefined ? Number(user.studentProfile.cgpa) : undefined,
+        batchName: batchName || '2022-2026 Batch',
+        employeeId: user.facultyProfile?.employeeId,
+        designation: user.facultyProfile?.designation,
+        specialization: user.facultyProfile?.specialization,
       },
     };
   }

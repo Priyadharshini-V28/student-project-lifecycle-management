@@ -10,7 +10,10 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   CLIENT_URL: z.string().url().default('http://localhost:5173'),
 
-  // PostgreSQL
+  // MongoDB Configuration
+  MONGODB_URI: z.string().default('mongodb://localhost:27017/splm_db'),
+
+  // PostgreSQL (retained for backward compatibility during migration)
   DB_HOST: z.string().default('localhost'),
   DB_PORT: z.coerce.number().default(5432),
   DB_NAME: z.string().default('splm_db'),

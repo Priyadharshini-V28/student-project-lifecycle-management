@@ -1,4 +1,4 @@
-import { query } from '../db';
+import { User, Project, Review, Proposal, Department, AcademicBatch } from '../models';
 import { ApiError } from '../utils/ApiError';
 import { logger } from '../utils/logger';
 
@@ -106,199 +106,148 @@ export class StudentService {
    */
   async getStudentDashboard(userId: string): Promise<StudentDashboardDto> {
     // 1. Fetch student demographic and institutional details
-    const studentRes = await query(
-      `SELECT 
-        u.id, u.first_name AS "firstName", u.last_name AS "lastName", u.email,
-        s.roll_number AS "rollNumber", s.semester, s.cgpa,
-        b.name AS "batchName",
-        d.code AS "departmentCode", d.name AS "departmentName"
-      FROM users u
-      JOIN students s ON u.id = s.user_id
-      LEFT JOIN academic_batches b ON s.batch_id = b.id
-      LEFT JOIN departments d ON u.department_id = d.id
-      WHERE u.id = $1 AND u.role = 'STUDENT'`,
-      [userId]
-    );
+    const student = await User.findOne({ _id: userId, role: 'STUDENT' });
 
-    if (studentRes.rows.length === 0) {
+    if (!student) {
       throw ApiError.notFound('Student record not found or user is not an active student');
     }
 
-    const studentRow = studentRes.rows[0];
+    const dept = student.departmentId ? await Department.findById(student.departmentId) : null;
+    const batch = student.studentProfile?.batchId ? await AcademicBatch.findById(student.studentProfile.batchId) : null;
 
-    // 2. Locate active project enrollment (prioritizes active/allocated capstone projects)
-    const projectRes = await query(
-      `SELECT 
-        p.id, p.title, p.abstract, p.domain, p.status, p.overall_progress AS "overallProgress",
-        p.repository_url AS "repositoryUrl", p.created_at AS "createdAt",
-        pm.role_in_project AS "roleInProject",
-        u_guide.id AS "guideId",
-        CONCAT(u_guide.first_name, ' ', u_guide.last_name) AS "guideName",
-        u_guide.email AS "guideEmail",
-        f.designation AS "guideDesignation",
-        d_guide.code AS "guideDepartmentCode"
-      FROM project_members pm
-      JOIN projects p ON pm.project_id = p.id
-      JOIN users u_guide ON p.faculty_guide_id = u_guide.id
-      LEFT JOIN faculty f ON u_guide.id = f.user_id
-      LEFT JOIN departments d_guide ON u_guide.department_id = d_guide.id
-      WHERE pm.student_id = $1
-      ORDER BY 
-        CASE 
-          WHEN p.status IN ('IN_PROGRESS', 'UNDER_REVIEW', 'CHANGES_REQUESTED') THEN 1
-          WHEN p.status = 'ALLOCATED' THEN 2
-          WHEN p.status = 'EVALUATED' THEN 3
-          WHEN p.status = 'COMPLETED' THEN 4
-          ELSE 5
-        END,
-        p.created_at DESC
-      LIMIT 1`,
-      [userId]
-    );
+    // 2. Locate active project enrollment
+    const projects = await Project.find({ 'teamMembers.studentId': userId });
+
+    const statusWeight: Record<string, number> = {
+      IN_PROGRESS: 1,
+      UNDER_REVIEW: 1,
+      CHANGES_REQUESTED: 1,
+      ALLOCATED: 2,
+      EVALUATED: 3,
+      COMPLETED: 4,
+    };
+
+    projects.sort((a, b) => {
+      const weightA = statusWeight[a.status] || 5;
+      const weightB = statusWeight[b.status] || 5;
+      if (weightA !== weightB) return weightA - weightB;
+      return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
+    });
+
+    const activeProjectDoc = projects.length > 0 ? projects[0] : null;
 
     let activeProject = null;
     let milestones: StudentDashboardDto['milestones'] = [];
     let latestReview: StudentDashboardDto['latestReview'] = null;
 
-    if (projectRes.rows.length > 0) {
-      const pRow = projectRes.rows[0];
-      const projectId = pRow.id;
+    if (activeProjectDoc) {
+      // 2a. Fetch supervisor & team members
+      const guide = await User.findById(activeProjectDoc.facultyGuideId);
+      const guideDept = guide?.departmentId ? await Department.findById(guide.departmentId) : null;
 
-      // 2a. Fetch team members for the active project
-      const teamRes = await query(
-        `SELECT 
-          u.id,
-          CONCAT(u.first_name, ' ', u.last_name) AS name,
-          u.email,
-          s.roll_number AS "rollNumber",
-          pm.role_in_project AS role
-        FROM project_members pm
-        JOIN users u ON pm.student_id = u.id
-        LEFT JOIN students s ON u.id = s.user_id
-        WHERE pm.project_id = $1
-        ORDER BY pm.role_in_project DESC, u.first_name ASC`,
-        [projectId]
+      const teamMembers = await Promise.all(
+        activeProjectDoc.teamMembers.map(async (m) => {
+          const u = await User.findById(m.studentId);
+          return {
+            id: m.studentId,
+            name: u ? `${u.firstName} ${u.lastName}` : 'Student',
+            email: u ? u.email : '',
+            rollNumber: u?.studentProfile?.rollNumber || '',
+            role: m.roleInProject as 'LEAD' | 'MEMBER',
+          };
+        })
       );
+
+      // Sort team members: LEAD first, then by name
+      teamMembers.sort((a, b) => {
+        if (a.role === 'LEAD' && b.role !== 'LEAD') return -1;
+        if (a.role !== 'LEAD' && b.role === 'LEAD') return 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      const memberRole = activeProjectDoc.teamMembers.find((m) => m.studentId === userId)?.roleInProject || 'MEMBER';
 
       activeProject = {
-        id: pRow.id,
-        title: pRow.title,
-        abstract: pRow.abstract,
-        domain: pRow.domain,
-        status: pRow.status,
-        overallProgress: parseInt(pRow.overallProgress || '0', 10),
-        repositoryUrl: pRow.repositoryUrl,
-        roleInProject: pRow.roleInProject as 'LEAD' | 'MEMBER',
-        createdAt: toIsoString(pRow.createdAt),
+        id: activeProjectDoc.id,
+        title: activeProjectDoc.title,
+        abstract: activeProjectDoc.abstract,
+        domain: activeProjectDoc.domain,
+        status: activeProjectDoc.status,
+        overallProgress: activeProjectDoc.overallProgress || 0,
+        repositoryUrl: activeProjectDoc.repositoryUrl || null,
+        roleInProject: memberRole as 'LEAD' | 'MEMBER',
+        createdAt: toIsoString(activeProjectDoc.createdAt),
         facultyGuide: {
-          id: pRow.guideId,
-          name: pRow.guideName,
-          email: pRow.guideEmail,
-          designation: pRow.guideDesignation || 'Faculty Supervisor',
-          departmentCode: pRow.guideDepartmentCode || 'AIDS',
+          id: guide?.id || '',
+          name: guide ? `${guide.firstName} ${guide.lastName}` : 'Unassigned',
+          email: guide?.email || '',
+          designation: guide?.facultyProfile?.designation || 'Faculty Supervisor',
+          departmentCode: guideDept?.code || 'AIDS',
         },
-        teamMembers: teamRes.rows.map((row) => ({
-          id: row.id,
-          name: row.name,
-          email: row.email,
-          rollNumber: row.rollNumber || '',
-          role: row.role as 'LEAD' | 'MEMBER',
-        })),
+        teamMembers,
       };
 
-      // 2b. Fetch milestones ordered chronologically
-      const milestonesRes = await query(
-        `SELECT 
-          m.id, m.milestone_number AS "milestoneNumber", m.title, m.description,
-          m.start_date AS "startDate", m.due_date AS "dueDate",
-          m.completion_percentage AS "completionPercentage", m.status,
-          m.student_remarks AS "studentRemarks", m.faculty_remarks AS "facultyRemarks",
-          m.completed_at AS "completedAt",
-          (m.status != 'COMPLETED' AND m.due_date < CURRENT_DATE) AS "isOverdue"
-        FROM milestones m
-        WHERE m.project_id = $1
-        ORDER BY m.milestone_number ASC`,
-        [projectId]
-      );
+      // 2b. Milestones ordered chronologically
+      const today = new Date();
+      milestones = (activeProjectDoc.milestones || [])
+        .sort((a, b) => a.milestoneNumber - b.milestoneNumber)
+        .map((m) => {
+          const isOverdue = m.status !== 'COMPLETED' && new Date(m.dueDate) < today;
+          return {
+            id: m._id ? String(m._id) : String(m.milestoneNumber),
+            milestoneNumber: m.milestoneNumber,
+            title: m.title,
+            description: m.description,
+            startDate: toIsoString(m.startDate),
+            dueDate: toIsoString(m.dueDate),
+            completionPercentage: m.completionPercentage || 0,
+            status: m.status as 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE',
+            isOverdue,
+            studentRemarks: m.studentRemarks || null,
+            facultyRemarks: m.facultyRemarks || null,
+            completedAt: m.completedAt ? toIsoString(m.completedAt) : null,
+          };
+        });
 
-      milestones = milestonesRes.rows.map((m) => ({
-        id: m.id,
-        milestoneNumber: m.milestoneNumber,
-        title: m.title,
-        description: m.description,
-        startDate: toIsoString(m.startDate),
-        dueDate: toIsoString(m.dueDate),
-        completionPercentage: parseInt(m.completionPercentage || '0', 10),
-        status: m.status as 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE',
-        isOverdue: Boolean(m.isOverdue),
-        studentRemarks: m.studentRemarks,
-        facultyRemarks: m.facultyRemarks,
-        completedAt: m.completedAt ? toIsoString(m.completedAt) : null,
-      }));
+      // 2c. Fetch latest faculty review
+      const reviews = await Review.find({ projectId: activeProjectDoc.id })
+        .sort({ roundNumber: -1, createdAt: -1 })
+        .limit(1);
 
-      // 2c. Fetch latest faculty review and check if an outstanding resubmission is needed
-      const reviewRes = await query(
-        `SELECT 
-          r.id, r.round_number AS "roundNumber", r.review_title AS "reviewTitle",
-          r.review_date AS "reviewDate", r.status, r.general_feedback AS "generalFeedback",
-          r.strengths, r.issues_identified AS "issuesIdentified", r.required_changes AS "requiredChanges",
-          r.has_marks AS "hasMarks", r.technical_score AS "technicalScore",
-          r.documentation_score AS "documentationScore", r.presentation_score AS "presentationScore",
-          r.total_score AS "totalScore",
-          CONCAT(u.first_name, ' ', u.last_name) AS "reviewerName"
-        FROM reviews r
-        JOIN users u ON r.faculty_id = u.id
-        WHERE r.project_id = $1
-        ORDER BY r.round_number DESC, r.created_at DESC
-        LIMIT 1`,
-        [projectId]
-      );
+      if (reviews.length > 0) {
+        const rDoc = reviews[0];
+        const reviewer = await User.findById(rDoc.facultyId);
 
-      if (reviewRes.rows.length > 0) {
-        const rRow = reviewRes.rows[0];
-
-        // Check if there is already a resubmission for this review
         let hasPendingResubmission = false;
-        if (rRow.status === 'CHANGES_REQUESTED') {
-          const resubRes = await query(
-            'SELECT id FROM review_resubmissions WHERE review_id = $1 LIMIT 1',
-            [rRow.id]
-          );
-          hasPendingResubmission = resubRes.rows.length === 0;
+        if (rDoc.status === 'CHANGES_REQUESTED') {
+          hasPendingResubmission = (rDoc.resubmissions || []).length === 0;
         }
 
         latestReview = {
-          id: rRow.id,
-          roundNumber: rRow.roundNumber,
-          reviewTitle: rRow.reviewTitle,
-          reviewDate: toIsoString(rRow.reviewDate),
-          status: rRow.status,
-          generalFeedback: rRow.generalFeedback,
-          strengths: rRow.strengths,
-          issuesIdentified: rRow.issuesIdentified,
-          requiredChanges: rRow.requiredChanges,
-          hasMarks: Boolean(rRow.hasMarks),
-          technicalScore: rRow.technicalScore ? parseFloat(rRow.technicalScore) : null,
-          documentationScore: rRow.documentationScore ? parseFloat(rRow.documentationScore) : null,
-          presentationScore: rRow.presentationScore ? parseFloat(rRow.presentationScore) : null,
-          totalScore: rRow.totalScore ? parseFloat(rRow.totalScore) : null,
-          reviewerName: rRow.reviewerName,
+          id: rDoc.id,
+          roundNumber: rDoc.roundNumber,
+          reviewTitle: rDoc.reviewTitle,
+          reviewDate: toIsoString(rDoc.reviewDate),
+          status: rDoc.status as 'APPROVED' | 'CHANGES_REQUESTED' | 'REJECTED',
+          generalFeedback: rDoc.generalFeedback,
+          strengths: rDoc.strengths || null,
+          issuesIdentified: rDoc.issuesIdentified || null,
+          requiredChanges: rDoc.requiredChanges || null,
+          hasMarks: Boolean(rDoc.hasMarks),
+          technicalScore: rDoc.technicalScore !== undefined ? Number(rDoc.technicalScore) : null,
+          documentationScore: rDoc.documentationScore !== undefined ? Number(rDoc.documentationScore) : null,
+          presentationScore: rDoc.presentationScore !== undefined ? Number(rDoc.presentationScore) : null,
+          totalScore: rDoc.totalScore !== undefined ? Number(rDoc.totalScore) : null,
+          reviewerName: reviewer ? `${reviewer.firstName} ${reviewer.lastName}` : 'Faculty Reviewer',
           hasPendingResubmission,
         };
       }
     }
 
     // 3. Fetch proposals submitted by the student
-    const proposalsRes = await query(
-      `SELECT 
-        id, title, domain, status, version, academic_year AS "academicYear", created_at AS "createdAt"
-      FROM proposals
-      WHERE submitted_by = $1
-      ORDER BY created_at DESC`,
-      [userId]
-    );
+    const proposals = await Proposal.find({ submittedBy: userId }).sort({ createdAt: -1 });
 
-    const proposals = proposalsRes.rows.map((p) => ({
+    const formattedProposals = proposals.map((p) => ({
       id: p.id,
       title: p.title,
       domain: p.domain,
@@ -323,16 +272,16 @@ export class StudentService {
 
     return {
       student: {
-        id: studentRow.id,
-        firstName: studentRow.firstName,
-        lastName: studentRow.lastName,
-        email: studentRow.email,
-        rollNumber: studentRow.rollNumber,
-        semester: studentRow.semester,
-        cgpa: studentRow.cgpa ? parseFloat(studentRow.cgpa) : 0.0,
-        batchName: studentRow.batchName || '2022-2026',
-        departmentCode: studentRow.departmentCode || 'AIDS',
-        departmentName: studentRow.departmentName || 'Artificial Intelligence & Data Science',
+        id: student.id,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        email: student.email,
+        rollNumber: student.studentProfile?.rollNumber || '',
+        semester: student.studentProfile?.semester || 1,
+        cgpa: student.studentProfile?.cgpa ? Number(student.studentProfile.cgpa) : 0.0,
+        batchName: batch?.name || '2022-2026 Batch',
+        departmentCode: dept?.code || 'AIDS',
+        departmentName: dept?.name || 'Department of Artificial Intelligence & Data Science',
       },
       metrics: {
         hasActiveProject: Boolean(activeProject),
@@ -343,12 +292,12 @@ export class StudentService {
         milestoneProgressPercentage,
         overdueMilestonesCount,
         pendingReviewAction,
-        proposalsCount: proposals.length,
+        proposalsCount: formattedProposals.length,
       },
       activeProject,
       milestones,
       latestReview,
-      proposals,
+      proposals: formattedProposals,
     };
   }
 }

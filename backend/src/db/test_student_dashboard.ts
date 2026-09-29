@@ -2,8 +2,11 @@ import { studentService } from '../services/student.service';
 import { requireRole } from '../middleware/auth.middleware';
 import { logger } from '../utils/logger';
 import { Request, Response, NextFunction } from 'express';
+import { connectMongo, disconnectMongo } from './mongo';
 
 export const runStudentDashboardTests = async (): Promise<void> => {
+  await connectMongo();
+
   logger.info('================================================================');
   logger.info('📊 STAGE 5: STUDENT DASHBOARD AGGREGATION & METRICS TEST SUITE');
   logger.info('================================================================');
@@ -166,6 +169,8 @@ export const runStudentDashboardTests = async (): Promise<void> => {
   logger.info('\n================================================================');
   logger.info('🎉 ALL 10 STAGE 5 STUDENT DASHBOARD TESTS PASSED PERFECTLY!');
   logger.info('================================================================\n');
+
+  await disconnectMongo();
 };
 
 // Standalone execution entrypoint

@@ -1,10 +1,13 @@
 import { userService } from '../services/user.service';
 import { authService } from '../services/auth.service';
 import { updateProfileSchema } from '../validators/user.validator';
-import { query } from '../db';
+import { AuditLog } from '../models';
+import { connectMongo, disconnectMongo } from './mongo';
 import { logger } from '../utils/logger';
 
 export const runProfileTests = async (): Promise<void> => {
+  await connectMongo();
+
   logger.info('================================================================');
   logger.info('👤 STAGE 4: STUDENT & FACULTY PROFILES TEST SUITE');
   logger.info('================================================================');
@@ -143,11 +146,8 @@ export const runProfileTests = async (): Promise<void> => {
   }
 
   // Verify audit log entry
-  const auditRes = await query(
-    `SELECT action, entity_type FROM audit_logs WHERE user_id = $1 ORDER BY id DESC LIMIT 1`,
-    [studentId]
-  );
-  console.log(`✓ Audit log verified: Action=${auditRes.rows[0]?.action}, Entity=${auditRes.rows[0]?.entity_type}`);
+  const auditDoc = await AuditLog.findOne({ userId: studentId }).sort({ createdAt: -1 });
+  console.log(`✓ Audit log verified: Action=${auditDoc?.action}, Entity=${auditDoc?.entityType}`);
 
   // Revert password back to default for clean local testing state
   await userService.changePassword(studentId, {
@@ -201,6 +201,8 @@ export const runProfileTests = async (): Promise<void> => {
   logger.info('\n================================================================');
   logger.info('🎉 ALL 10 STAGE 4 PROFILE TESTS PASSED PERFECTLY!');
   logger.info('================================================================\n');
+
+  await disconnectMongo();
 };
 
 // Standalone execution entrypoint

@@ -1,47 +1,31 @@
-import fs from 'fs';
-import path from 'path';
-import { pool } from './index';
+import { connectMongo, disconnectMongo } from './mongo';
+import * as models from '../models';
 import { logger } from '../utils/logger';
 
 export const runMigrations = async (): Promise<void> => {
   logger.info('====================================================');
-  logger.info('📦 Running Database Migrations...');
+  logger.info('📦 Synchronizing MongoDB Collections & Indexes...');
   logger.info('====================================================');
 
-  const migrationFile = path.resolve(__dirname, 'migrations/001_create_tables.sql');
+  await connectMongo();
 
-  if (!fs.existsSync(migrationFile)) {
-    throw new Error(`Migration file not found at: ${migrationFile}`);
+  for (const modelName of Object.keys(models)) {
+    const m = (models as Record<string, any>)[modelName];
+    if (m && typeof m.init === 'function') {
+      await m.init();
+      logger.info(`✓ Synchronized index for ${modelName}`);
+    }
   }
 
-  const sql = fs.readFileSync(migrationFile, 'utf-8');
-
-  const client = await pool.connect();
-  try {
-    logger.info('Executing DDL: 001_create_tables.sql');
-    await client.query('BEGIN');
-    await client.query(sql);
-    await client.query('COMMIT');
-    logger.info('✅ All 17 tables, constraints, and indexes migrated successfully.');
-  } catch (err) {
-    await client.query('ROLLBACK');
-    logger.error('❌ Migration failed:', err);
-    throw err;
-  } finally {
-    client.release();
-  }
+  logger.info('✅ All MongoDB collections, constraints, and indexes synchronized.');
+  await disconnectMongo();
 };
 
-// Execute directly if run via CLI
 if (require.main === module) {
   runMigrations()
-    .then(async () => {
-      await pool.end();
-      process.exit(0);
-    })
-    .catch(async (err) => {
+    .then(() => process.exit(0))
+    .catch((err) => {
       logger.error('Fatal migration error:', err);
-      await pool.end();
       process.exit(1);
     });
 }

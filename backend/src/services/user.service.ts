@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { query, transaction } from '../db';
+import { User, Project, Department, AcademicBatch, AuditLog } from '../models';
 import { ApiError } from '../utils/ApiError';
 import { logger } from '../utils/logger';
 import { AuthenticatedUser, UserRole } from '../types/auth.types';
@@ -10,67 +10,54 @@ export class UserService {
    * Get full user profile with department and specialized details
    */
   async getUserProfile(userId: string): Promise<AuthenticatedUser & { activeProjectCount: number }> {
-    const userRes = await query(
-      `SELECT 
-        u.id, u.email, u.first_name AS "firstName", u.last_name AS "lastName", 
-        u.role, u.department_id AS "departmentId",
-        d.code AS "departmentCode", d.name AS "departmentName",
-        s.roll_number AS "rollNumber", s.semester, s.cgpa, b.name AS "batchName",
-        f.employee_id AS "employeeId", f.designation, f.specialization
-      FROM users u
-      LEFT JOIN departments d ON u.department_id = d.id
-      LEFT JOIN students s ON u.id = s.user_id
-      LEFT JOIN academic_batches b ON s.batch_id = b.id
-      LEFT JOIN faculty f ON u.id = f.user_id
-      WHERE u.id = $1`,
-      [userId]
-    );
+    const user = await User.findById(userId);
 
-    if (userRes.rows.length === 0) {
+    if (!user) {
       throw ApiError.notFound('User not found');
     }
 
-    const row = userRes.rows[0];
+    const dept = user.departmentId ? await Department.findById(user.departmentId) : null;
+    let batchName: string | undefined;
+
+    if (user.role === 'STUDENT' && user.studentProfile?.batchId) {
+      const batch = await AcademicBatch.findById(user.studentProfile.batchId);
+      batchName = batch?.name;
+    }
 
     // Compute active project count based on role
     let activeProjectCount = 0;
-    if (row.role === 'STUDENT') {
-      const pCountRes = await query(
-        `SELECT COUNT(p.id) AS count 
-         FROM project_members pm
-         JOIN projects p ON pm.project_id = p.id
-         WHERE pm.student_id = $1 AND p.status IN ('ALLOCATED', 'IN_PROGRESS', 'UNDER_REVIEW', 'CHANGES_REQUESTED')`,
-        [userId]
-      );
-      activeProjectCount = parseInt(pCountRes.rows[0]?.count || '0', 10);
-    } else if (row.role === 'FACULTY') {
-      const pCountRes = await query(
-        `SELECT COUNT(id) AS count 
-         FROM projects 
-         WHERE faculty_guide_id = $1 AND status IN ('ALLOCATED', 'IN_PROGRESS', 'UNDER_REVIEW', 'CHANGES_REQUESTED')`,
-        [userId]
-      );
-      activeProjectCount = parseInt(pCountRes.rows[0]?.count || '0', 10);
+    const activeStatuses = ['ALLOCATED', 'IN_PROGRESS', 'UNDER_REVIEW', 'CHANGES_REQUESTED'] as const;
+
+    if (user.role === 'STUDENT') {
+      activeProjectCount = await Project.countDocuments({
+        'teamMembers.studentId': userId,
+        status: { $in: activeStatuses },
+      });
+    } else if (user.role === 'FACULTY') {
+      activeProjectCount = await Project.countDocuments({
+        facultyGuideId: userId,
+        status: { $in: activeStatuses },
+      });
     }
 
     return {
-      id: row.id,
-      email: row.email,
-      firstName: row.firstName,
-      lastName: row.lastName,
-      role: row.role as UserRole,
-      departmentId: row.departmentId,
-      departmentCode: row.departmentCode,
-      departmentName: row.departmentName,
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      departmentId: user.departmentId,
+      departmentCode: dept?.code || 'AIDS',
+      departmentName: dept?.name || 'Department of Artificial Intelligence & Data Science',
       activeProjectCount,
       profile: {
-        rollNumber: row.rollNumber,
-        semester: row.semester,
-        cgpa: row.cgpa ? parseFloat(row.cgpa) : undefined,
-        batchName: row.batchName,
-        employeeId: row.employeeId,
-        designation: row.designation,
-        specialization: row.specialization,
+        rollNumber: user.studentProfile?.rollNumber,
+        semester: user.studentProfile?.semester,
+        cgpa: user.studentProfile?.cgpa !== undefined ? Number(user.studentProfile.cgpa) : undefined,
+        batchName: batchName || '2022-2026 Batch',
+        employeeId: user.facultyProfile?.employeeId,
+        designation: user.facultyProfile?.designation,
+        specialization: user.facultyProfile?.specialization,
       },
     };
   }
@@ -83,73 +70,32 @@ export class UserService {
     role: UserRole,
     input: UpdateProfileInput
   ): Promise<AuthenticatedUser & { activeProjectCount: number }> {
-    await transaction(async (client) => {
-      // 1. Update basic user table if names provided
-      if (input.firstName || input.lastName) {
-        const updates: string[] = [];
-        const params: unknown[] = [userId];
+    const user = await User.findById(userId);
+    if (!user) {
+      throw ApiError.notFound('User not found');
+    }
 
-        if (input.firstName) {
-          params.push(input.firstName);
-          updates.push(`first_name = $${params.length}`);
-        }
-        if (input.lastName) {
-          params.push(input.lastName);
-          updates.push(`last_name = $${params.length}`);
-        }
+    // 1. Update basic user fields
+    if (input.firstName) user.firstName = input.firstName;
+    if (input.lastName) user.lastName = input.lastName;
 
-        updates.push('updated_at = CURRENT_TIMESTAMP');
+    // 2. Update Student specific fields
+    if (role === 'STUDENT') {
+      if (!user.studentProfile) user.studentProfile = {};
+      if (input.semester !== undefined) user.studentProfile.semester = input.semester;
+      if (input.cgpa !== undefined) user.studentProfile.cgpa = input.cgpa;
+      user.markModified('studentProfile');
+    }
 
-        await client.query(
-          `UPDATE users SET ${updates.join(', ')} WHERE id = $1`,
-          params
-        );
-      }
+    // 3. Update Faculty specific fields
+    if (role === 'FACULTY') {
+      if (!user.facultyProfile) user.facultyProfile = {};
+      if (input.designation !== undefined) user.facultyProfile.designation = input.designation;
+      if (input.specialization !== undefined) user.facultyProfile.specialization = input.specialization;
+      user.markModified('facultyProfile');
+    }
 
-      // 2. Update Student specific fields
-      if (role === 'STUDENT' && (input.semester !== undefined || input.cgpa !== undefined)) {
-        const studentUpdates: string[] = [];
-        const studentParams: unknown[] = [userId];
-
-        if (input.semester !== undefined) {
-          studentParams.push(input.semester);
-          studentUpdates.push(`semester = $${studentParams.length}`);
-        }
-        if (input.cgpa !== undefined) {
-          studentParams.push(input.cgpa);
-          studentUpdates.push(`cgpa = $${studentParams.length}`);
-        }
-
-        if (studentUpdates.length > 0) {
-          await client.query(
-            `UPDATE students SET ${studentUpdates.join(', ')} WHERE user_id = $1`,
-            studentParams
-          );
-        }
-      }
-
-      // 3. Update Faculty specific fields
-      if (role === 'FACULTY' && (input.designation || input.specialization)) {
-        const facultyUpdates: string[] = [];
-        const facultyParams: unknown[] = [userId];
-
-        if (input.designation) {
-          facultyParams.push(input.designation);
-          facultyUpdates.push(`designation = $${facultyParams.length}`);
-        }
-        if (input.specialization) {
-          facultyParams.push(input.specialization);
-          facultyUpdates.push(`specialization = $${facultyParams.length}`);
-        }
-
-        if (facultyUpdates.length > 0) {
-          await client.query(
-            `UPDATE faculty SET ${facultyUpdates.join(', ')} WHERE user_id = $1`,
-            facultyParams
-          );
-        }
-      }
-    });
+    await user.save();
 
     logger.info(`Profile updated successfully for user ID: ${userId}`);
     return this.getUserProfile(userId);
@@ -159,40 +105,30 @@ export class UserService {
    * Change user password securely
    */
   async changePassword(userId: string, input: ChangePasswordInput): Promise<void> {
-    // 1. Fetch current hash
-    const userRes = await query(
-      'SELECT password_hash FROM users WHERE id = $1',
-      [userId]
-    );
-
-    if (userRes.rows.length === 0) {
+    const user = await User.findById(userId);
+    if (!user) {
       throw ApiError.notFound('User not found');
     }
 
-    const { password_hash } = userRes.rows[0];
-
-    // 2. Validate current password
-    const isCurrentValid = await bcrypt.compare(input.currentPassword, password_hash);
+    // Validate current password
+    const isCurrentValid = await bcrypt.compare(input.currentPassword, user.passwordHash);
     if (!isCurrentValid) {
       throw ApiError.badRequest('Current password is incorrect');
     }
 
-    // 3. Hash new password
+    // Hash new password
     const salt = await bcrypt.genSalt(10);
-    const newHash = await bcrypt.hash(input.newPassword, salt);
+    user.passwordHash = await bcrypt.hash(input.newPassword, salt);
+    await user.save();
 
-    // 4. Update in database
-    await query(
-      'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [newHash, userId]
-    );
-
-    // 5. Record in audit log
-    await query(
-      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
-       VALUES ($1, 'PASSWORD_CHANGED', 'USER', $1, '{"status": "success"}')`,
-      [userId]
-    );
+    // Record in audit log
+    await AuditLog.create({
+      userId,
+      action: 'PASSWORD_CHANGED',
+      entityType: 'USER',
+      entityId: userId,
+      details: { status: 'success' },
+    });
 
     logger.info(`Password changed successfully for user ID: ${userId}`);
   }
@@ -206,22 +142,28 @@ export class UserService {
       throw ApiError.forbidden('Only students have access to student academic profile');
     }
 
-    // Fetch projects for this student
-    const projectsRes = await query(
-      `SELECT 
-        p.id AS "projectId", p.title, p.domain, p.status, p.overall_progress AS "progress",
-        pm.role_in_project AS "roleInProject",
-        CONCAT(u_guide.first_name, ' ', u_guide.last_name) AS "facultyGuide"
-       FROM project_members pm
-       JOIN projects p ON pm.project_id = p.id
-       JOIN users u_guide ON p.faculty_guide_id = u_guide.id
-       WHERE pm.student_id = $1`,
-      [userId]
+    const projects = await Project.find({ 'teamMembers.studentId': userId });
+
+    const formattedProjects = await Promise.all(
+      projects.map(async (p) => {
+        const guide = await User.findById(p.facultyGuideId);
+        const memberInfo = p.teamMembers.find((m) => m.studentId === userId);
+
+        return {
+          projectId: p.id,
+          title: p.title,
+          domain: p.domain,
+          status: p.status,
+          progress: p.overallProgress,
+          roleInProject: memberInfo?.roleInProject || 'MEMBER',
+          facultyGuide: guide ? `${guide.firstName} ${guide.lastName}` : 'Unassigned',
+        };
+      })
     );
 
     return {
       ...profile,
-      projects: projectsRes.rows,
+      projects: formattedProjects,
     };
   }
 
@@ -234,41 +176,40 @@ export class UserService {
       throw ApiError.forbidden('Only faculty members have access to faculty academic profile');
     }
 
-    // Fetch assigned projects and capacity
-    const projectsRes = await query(
-      `SELECT 
-        p.id AS "projectId", p.title, p.domain, p.status, p.overall_progress AS "progress",
-        CONCAT(u_lead.first_name, ' ', u_lead.last_name) AS "studentLead",
-        p.created_at AS "allocatedAt"
-       FROM projects p
-       JOIN project_members pm ON p.id = pm.project_id AND pm.role_in_project = 'LEAD'
-       JOIN users u_lead ON pm.student_id = u_lead.id
-       WHERE p.faculty_guide_id = $1`,
-      [userId]
+    const projects = await Project.find({ facultyGuideId: userId });
+
+    const formattedProjects = await Promise.all(
+      projects.map(async (p) => {
+        const leadMember = p.teamMembers.find((m) => m.roleInProject === 'LEAD');
+        const leadUser = leadMember ? await User.findById(leadMember.studentId) : null;
+
+        return {
+          projectId: p.id,
+          title: p.title,
+          domain: p.domain,
+          status: p.status,
+          progress: p.overallProgress,
+          studentLead: leadUser ? `${leadUser.firstName} ${leadUser.lastName}` : 'Unassigned',
+          allocatedAt: p.createdAt ? p.createdAt.toISOString() : new Date().toISOString(),
+        };
+      })
     );
 
-    // Fetch pending reviews count
-    const pendingReviewsRes = await query(
-      `SELECT COUNT(p.id) AS count
-       FROM projects p
-       WHERE p.faculty_guide_id = $1 AND p.status = 'UNDER_REVIEW'`,
-      [userId]
-    );
+    const pendingReviewsCount = await Project.countDocuments({
+      facultyGuideId: userId,
+      status: 'UNDER_REVIEW',
+    });
 
-    const facultyDetailsRes = await query(
-      'SELECT max_projects AS "maxQuota" FROM faculty WHERE user_id = $1',
-      [userId]
-    );
-
-    const maxQuota = facultyDetailsRes.rows[0]?.maxQuota || 5;
+    const user = await User.findById(userId);
+    const maxQuota = user?.facultyProfile?.maxProjects || 5;
 
     return {
       ...profile,
       maxQuota,
-      currentlyAssigned: projectsRes.rows.length,
-      remainingCapacity: Math.max(0, maxQuota - projectsRes.rows.length),
-      pendingReviewsCount: parseInt(pendingReviewsRes.rows[0]?.count || '0', 10),
-      assignedProjects: projectsRes.rows,
+      currentlyAssigned: projects.length,
+      remainingCapacity: Math.max(0, maxQuota - projects.length),
+      pendingReviewsCount,
+      assignedProjects: formattedProjects,
     };
   }
 }

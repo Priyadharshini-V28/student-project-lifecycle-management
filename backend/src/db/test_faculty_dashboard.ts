@@ -1,10 +1,13 @@
 import { facultyService } from '../services/faculty.service';
 import { requireRole } from '../middleware/auth.middleware';
-import { query } from '../db';
+import { Project } from '../models';
+import { connectMongo, disconnectMongo } from './mongo';
 import { logger } from '../utils/logger';
 import { Request, Response, NextFunction } from 'express';
 
 export const runFacultyDashboardTests = async (): Promise<void> => {
+  await connectMongo();
+
   logger.info('================================================================');
   logger.info('📊 STAGE 6: FACULTY DASHBOARD AGGREGATION & ACTION QUEUES TEST SUITE');
   logger.info('================================================================');
@@ -112,7 +115,7 @@ export const runFacultyDashboardTests = async (): Promise<void> => {
 
   // Test 8: Pending Reviews Trigger Simulation
   logger.info('\n▶ Test 8: Action Queue Trigger Verification (Simulate Project in UNDER_REVIEW)');
-  await query("UPDATE projects SET status = 'UNDER_REVIEW' WHERE id = 'e0000000-0000-0000-0000-000000000001'");
+  await Project.updateOne({ _id: 'e0000000-0000-0000-0000-000000000001' }, { status: 'UNDER_REVIEW' });
 
   const dash1Updated = await facultyService.getFacultyDashboard(facultyId1);
   console.log(`✓ Triggered pending reviews count: ${dash1Updated.metrics.pendingReviewsCount}`);
@@ -122,7 +125,7 @@ export const runFacultyDashboardTests = async (): Promise<void> => {
   console.log(`  Queued Review Project: "${dash1Updated.actionQueues.pendingReviews[0].projectTitle}"`);
 
   // Restore project status back to IN_PROGRESS
-  await query("UPDATE projects SET status = 'IN_PROGRESS' WHERE id = 'e0000000-0000-0000-0000-000000000001'");
+  await Project.updateOne({ _id: 'e0000000-0000-0000-0000-000000000001' }, { status: 'IN_PROGRESS' });
   const dash1Restored = await facultyService.getFacultyDashboard(facultyId1);
   console.log(`✓ Restored: Pending reviews count is back to ${dash1Restored.metrics.pendingReviewsCount}`);
 
@@ -158,6 +161,8 @@ export const runFacultyDashboardTests = async (): Promise<void> => {
   logger.info('\n================================================================');
   logger.info('🎉 ALL 10 STAGE 6 FACULTY DASHBOARD TESTS PASSED PERFECTLY!');
   logger.info('================================================================\n');
+
+  await disconnectMongo();
 };
 
 // Standalone execution entrypoint

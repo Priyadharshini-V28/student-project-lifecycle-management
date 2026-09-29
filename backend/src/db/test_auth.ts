@@ -3,8 +3,11 @@ import { verifyAccessToken } from '../utils/jwt';
 import { requireRole } from '../middleware/auth.middleware';
 import { logger } from '../utils/logger';
 import { Request, Response, NextFunction } from 'express';
+import { connectMongo, disconnectMongo } from './mongo';
 
 export const runAuthTests = async (): Promise<void> => {
+  await connectMongo();
+
   logger.info('================================================================');
   logger.info('🔐 STAGE 3: AUTHENTICATION & ROLE AUTHORIZATION TEST SUITE');
   logger.info('================================================================');
@@ -142,6 +145,8 @@ export const runAuthTests = async (): Promise<void> => {
   logger.info('\n================================================================');
   logger.info('🎉 STAGE 3 BACKEND AUTH & RBAC VERIFICATION COMPLETED (10/10 TESTS PASSED)');
   logger.info('================================================================');
+
+  await disconnectMongo();
 };
 
 if (require.main === module) {

@@ -1,8 +1,11 @@
 import { proposalService } from '../services/proposal.service';
-import { query } from '../db';
+import { User, Project } from '../models';
+import { connectMongo, disconnectMongo } from './mongo';
 import { logger } from '../utils/logger';
 
 export const runProposalTests = async (): Promise<void> => {
+  await connectMongo();
+
   logger.info('================================================================');
   logger.info('📑 STAGE 7: PROPOSAL & PROJECT LIFECYCLE MANAGEMENT TEST SUITE');
   logger.info('================================================================');
@@ -39,6 +42,7 @@ export const runProposalTests = async (): Promise<void> => {
     abstract: 'Investigating zero-shot vision-language alignment architectures for microscopic histology image analysis across rare oncological subtypes.',
     domain: 'Multimodal AI & Healthcare',
     techStack: ['PyTorch', 'CLIP', 'BioBERT', 'FastAPI', 'React'],
+    coMemberStudentIds: [],
     assignedFacultyId: faculty2Id,
     initialStatus: 'DRAFT',
   });
@@ -170,13 +174,12 @@ export const runProposalTests = async (): Promise<void> => {
   // --------------------------------------------------------------------------
   logger.info('\n▶ Test 8: Faculty Workload Quota Verification');
   // Check Faculty 2 capacity
-  const fac2Res = await query(`SELECT max_projects FROM faculty WHERE user_id = $1`, [faculty2Id]);
-  const fac2Max = fac2Res.rows[0]?.max_projects ?? 6;
-  const currentAssignedRes = await query(
-    `SELECT COUNT(id) AS count FROM projects WHERE faculty_guide_id = $1 AND status NOT IN ('COMPLETED', 'ARCHIVED')`,
-    [faculty2Id]
-  );
-  const currentAssigned = parseInt(currentAssignedRes.rows[0]?.count || '0', 10);
+  const fac2User = await User.findById(faculty2Id);
+  const fac2Max = fac2User?.facultyProfile?.maxProjects ?? 6;
+  const currentAssigned = await Project.countDocuments({
+    facultyGuideId: faculty2Id,
+    status: { $nin: ['COMPLETED', 'ARCHIVED'] },
+  });
   console.log(`✓ Faculty 2 Supervising Capacity: ${currentAssigned} / ${fac2Max} projects`);
 
   if (currentAssigned >= fac2Max) {
@@ -271,6 +274,8 @@ export const runProposalTests = async (): Promise<void> => {
   logger.info('\n================================================================');
   logger.info('🎉 ALL 10 STAGE 7 PROPOSAL & PROJECT TESTS PASSED PERFECTLY!');
   logger.info('================================================================\n');
+
+  await disconnectMongo();
 };
 
 // Standalone execution entrypoint

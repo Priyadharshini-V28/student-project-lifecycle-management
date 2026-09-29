@@ -1,4 +1,13 @@
-import { query, transaction } from '../db';
+import crypto from 'crypto';
+import {
+  User,
+  Proposal,
+  Project,
+  Department,
+  SystemSetting,
+  AuditLog,
+} from '../models';
+import { withMongoTransaction } from '../db/mongo';
 import { ApiError } from '../utils/ApiError';
 import { logger } from '../utils/logger';
 import {
@@ -20,7 +29,7 @@ const toDateString = (val: unknown): string => {
 };
 
 export interface ProposalMemberItem {
-  id: number;
+  id: string | number;
   studentId: string;
   name: string;
   email: string;
@@ -70,13 +79,13 @@ export class ProposalService {
     minTeamSize: number;
     allowStudentProposals: boolean;
   }> {
-    const res = await query(
-      `SELECT key, value FROM system_settings WHERE key IN ('MAX_TEAM_SIZE', 'MIN_TEAM_SIZE', 'ALLOW_STUDENT_PROPOSALS')`
-    );
+    const settings = await SystemSetting.find({
+      key: { $in: ['MAX_TEAM_SIZE', 'MIN_TEAM_SIZE', 'ALLOW_STUDENT_PROPOSALS'] },
+    });
 
     const map: Record<string, string> = {};
-    for (const row of res.rows) {
-      map[row.key] = row.value;
+    for (const s of settings) {
+      map[s.key] = s.value;
     }
 
     return {
@@ -91,15 +100,8 @@ export class ProposalService {
    */
   async createProposal(studentUserId: string, input: CreateProposalInput): Promise<ProposalDetail> {
     // 1. Verify student account
-    const studentRes = await query(
-      `SELECT u.id, u.first_name, u.last_name, u.role, s.roll_number 
-       FROM users u 
-       JOIN students s ON u.id = s.user_id 
-       WHERE u.id = $1`,
-      [studentUserId]
-    );
-
-    if (studentRes.rows.length === 0) {
+    const student = await User.findOne({ _id: studentUserId, role: 'STUDENT' });
+    if (!student) {
       throw ApiError.forbidden('Only enrolled students can author and submit project proposals.');
     }
 
@@ -123,11 +125,11 @@ export class ProposalService {
 
     // 4. Validate assigned faculty if provided
     if (input.assignedFacultyId) {
-      const facRes = await query(
-        `SELECT user_id FROM faculty WHERE user_id = $1`,
-        [input.assignedFacultyId]
-      );
-      if (facRes.rows.length === 0) {
+      const fac = await User.findOne({
+        _id: input.assignedFacultyId,
+        role: { $in: ['FACULTY', 'ADMIN'] },
+      });
+      if (!fac) {
         throw ApiError.badRequest('Selected faculty guide was not found in the faculty directory.');
       }
     }
@@ -135,8 +137,8 @@ export class ProposalService {
     // 5. Verify prospective co-members are enrolled students
     if (coMemberIds.length > 0) {
       for (const mId of coMemberIds) {
-        const memRes = await query(`SELECT user_id FROM students WHERE user_id = $1`, [mId]);
-        if (memRes.rows.length === 0) {
+        const mem = await User.findOne({ _id: mId, role: 'STUDENT' });
+        if (!mem) {
           throw ApiError.badRequest(`User with ID ${mId} is not an enrolled student.`);
         }
       }
@@ -150,96 +152,94 @@ export class ProposalService {
         : initialStatus;
 
     // 7. Execute transactional insertion
-    const createdProposal = await transaction(async (client) => {
-      const propInsert = await client.query(
-        `INSERT INTO proposals (
-          title, abstract, domain, tech_stack, submitted_by, assigned_faculty_id, status, version
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 1)
-        RETURNING id`,
+    const createdProposalId = await withMongoTransaction(async (session) => {
+      const members = [
+        {
+          _id: crypto.randomUUID(),
+          studentId: studentUserId,
+          status: 'ACCEPTED' as const,
+          isLead: true,
+          joinedAt: new Date(),
+        },
+        ...coMemberIds.map((mId) => ({
+          _id: crypto.randomUUID(),
+          studentId: mId,
+          status: 'INVITED' as const,
+          isLead: false,
+          joinedAt: new Date(),
+        })),
+      ];
+
+      const propDoc = new Proposal({
+        title: input.title,
+        abstract: input.abstract,
+        domain: input.domain,
+        techStack: input.techStack || [],
+        submittedBy: studentUserId,
+        assignedFacultyId: input.assignedFacultyId || undefined,
+        status: finalInitialStatus,
+        version: 1,
+        academicYear: '2025-2026',
+        members,
+      });
+
+      await propDoc.save({ session });
+
+      await AuditLog.create(
         [
-          input.title,
-          input.abstract,
-          input.domain,
-          input.techStack,
-          studentUserId,
-          input.assignedFacultyId || null,
-          finalInitialStatus,
-        ]
+          {
+            userId: studentUserId,
+            action: 'PROPOSAL_CREATED',
+            entityType: 'PROPOSAL',
+            entityId: propDoc.id,
+            details: { title: input.title, initialStatus: finalInitialStatus },
+          },
+        ],
+        { session }
       );
 
-      const proposalId = propInsert.rows[0].id;
-
-      // Creator is automatically accepted member
-      await client.query(
-        `INSERT INTO proposal_members (proposal_id, student_id, status) VALUES ($1, $2, 'ACCEPTED')`,
-        [proposalId, studentUserId]
-      );
-
-      // Invited co-members
-      for (const mId of coMemberIds) {
-        await client.query(
-          `INSERT INTO proposal_members (proposal_id, student_id, status) VALUES ($1, $2, 'INVITED')`,
-          [proposalId, mId]
-        );
-      }
-
-      // Audit log
-      await client.query(
-        `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [
-          studentUserId,
-          'PROPOSAL_CREATED',
-          'PROPOSAL',
-          proposalId,
-          JSON.stringify({ title: input.title, initialStatus: finalInitialStatus }),
-        ]
-      );
-
-      return proposalId;
+      return propDoc.id;
     });
 
-    logger.info(`[ProposalService] Proposal ${createdProposal} created by student ${studentUserId}`);
-    return this.getProposalById(createdProposal);
+    logger.info(`[ProposalService] Proposal ${createdProposalId} created by student ${studentUserId}`);
+    return this.getProposalById(createdProposalId);
   }
 
   /**
    * List proposals visible to the user based on role
    */
   async getProposalsForUser(userId: string, role: string): Promise<ProposalDetail[]> {
-    let proposalIds: string[] = [];
+    let proposalDocs = [];
 
     if (role === 'STUDENT') {
-      const res = await query(
-        `SELECT DISTINCT p.id 
-         FROM proposals p
-         LEFT JOIN proposal_members pm ON p.id = pm.proposal_id
-         WHERE p.submitted_by = $1 OR pm.student_id = $1
-         ORDER BY p.id`,
-        [userId]
-      );
-      proposalIds = res.rows.map((r) => r.id);
+      proposalDocs = await Proposal.find({
+        $or: [{ submittedBy: userId }, { 'members.studentId': userId }],
+      }).sort({ createdAt: -1 });
     } else if (role === 'FACULTY') {
-      const res = await query(
-        `SELECT DISTINCT p.id 
-         FROM proposals p
-         JOIN users u ON u.id = $1
-         LEFT JOIN users submitter ON p.submitted_by = submitter.id
-         WHERE p.assigned_faculty_id = $1 
-            OR (p.assigned_faculty_id IS NULL AND submitter.department_id = u.department_id AND p.status != 'DRAFT')
-         ORDER BY p.id`,
-        [userId]
-      );
-      proposalIds = res.rows.map((r) => r.id);
+      const facultyUser = await User.findById(userId);
+      const deptStudents = facultyUser?.departmentId
+        ? await User.find({ departmentId: facultyUser.departmentId, role: 'STUDENT' }).select('_id')
+        : [];
+      const deptStudentIds = deptStudents.map((s) => s.id);
+
+      proposalDocs = await Proposal.find({
+        $or: [
+          { assignedFacultyId: userId },
+          {
+            assignedFacultyId: { $in: [null, undefined] },
+            submittedBy: { $in: deptStudentIds },
+            status: { $ne: 'DRAFT' },
+          },
+        ],
+      }).sort({ createdAt: -1 });
     } else {
-      // ADMIN sees all proposals
-      const res = await query(`SELECT id FROM proposals ORDER BY created_at DESC`);
-      proposalIds = res.rows.map((r) => r.id);
+      // ADMIN
+      proposalDocs = await Proposal.find({}).sort({ createdAt: -1 });
     }
 
     const proposals: ProposalDetail[] = [];
-    for (const id of proposalIds) {
-      const p = await this.getProposalById(id);
+    for (const doc of proposalDocs) {
+      const p = await this.getProposalById(doc.id);
       proposals.push(p);
     }
     return proposals;
@@ -249,92 +249,72 @@ export class ProposalService {
    * Retrieve complete proposal details including members, submitter, and supervisor info
    */
   async getProposalById(proposalId: string): Promise<ProposalDetail> {
-    const propRes = await query(
-      `SELECT 
-        p.id, p.title, p.abstract, p.domain, p.tech_stack AS "techStack",
-        p.submitted_by AS "submittedById",
-        sub.first_name AS "subFirstName", sub.last_name AS "subLastName", sub.email AS "subEmail",
-        s.roll_number AS "subRollNumber", d.code AS "subDeptCode",
-        p.assigned_faculty_id AS "assignedFacultyId",
-        fac_u.first_name AS "facFirstName", fac_u.last_name AS "facLastName", fac_u.email AS "facEmail",
-        fac.designation AS "facDesignation", fac_d.code AS "facDeptCode",
-        p.status, p.faculty_comments AS "facultyComments", p.version,
-        p.academic_year AS "academicYear", p.created_at AS "createdAt", p.updated_at AS "updatedAt",
-        proj.id AS "projectId"
-      FROM proposals p
-      JOIN users sub ON p.submitted_by = sub.id
-      JOIN students s ON sub.id = s.user_id
-      LEFT JOIN departments d ON sub.department_id = d.id
-      LEFT JOIN users fac_u ON p.assigned_faculty_id = fac_u.id
-      LEFT JOIN faculty fac ON fac_u.id = fac.user_id
-      LEFT JOIN departments fac_d ON fac_u.department_id = fac_d.id
-      LEFT JOIN projects proj ON p.id = proj.proposal_id
-      WHERE p.id = $1`,
-      [proposalId]
-    );
-
-    if (propRes.rows.length === 0) {
+    const prop = await Proposal.findById(proposalId);
+    if (!prop) {
       throw ApiError.notFound(`Proposal with ID ${proposalId} not found.`);
     }
 
-    const row = propRes.rows[0];
+    const submitter = await User.findById(prop.submittedBy);
+    const subDept = submitter?.departmentId ? await Department.findById(submitter.departmentId) : null;
 
-    // Fetch team members
-    const memRes = await query(
-      `SELECT 
-        pm.id, pm.student_id AS "studentId", pm.status, pm.joined_at AS "joinedAt",
-        u.first_name AS "firstName", u.last_name AS "lastName", u.email,
-        s.roll_number AS "rollNumber", s.semester
-      FROM proposal_members pm
-      JOIN users u ON pm.student_id = u.id
-      JOIN students s ON u.id = s.user_id
-      WHERE pm.proposal_id = $1
-      ORDER BY pm.joined_at ASC`,
-      [proposalId]
+    let assignedFaculty = null;
+    if (prop.assignedFacultyId) {
+      const fac = await User.findById(prop.assignedFacultyId);
+      if (fac) {
+        const facDept = fac.departmentId ? await Department.findById(fac.departmentId) : null;
+        assignedFaculty = {
+          id: fac.id,
+          name: `${fac.firstName} ${fac.lastName}`,
+          email: fac.email,
+          designation: fac.facultyProfile?.designation || 'Faculty Advisor',
+          departmentCode: facDept?.code || 'AIDS',
+        };
+      }
+    }
+
+    // Check linked project
+    const project = await Project.findOne({ proposalId: prop.id });
+
+    // Format members
+    const members: ProposalMemberItem[] = await Promise.all(
+      (prop.members || []).map(async (m, idx) => {
+        const u = await User.findById(m.studentId);
+        return {
+          id: m._id ? String(m._id) : (idx + 1),
+          studentId: m.studentId,
+          name: u ? `${u.firstName} ${u.lastName}` : 'Student',
+          email: u?.email || '',
+          rollNumber: u?.studentProfile?.rollNumber || '',
+          semester: u?.studentProfile?.semester || 1,
+          status: m.status,
+          isLead: m.studentId === prop.submittedBy,
+          joinedAt: toIsoString(m.joinedAt),
+        };
+      })
     );
 
-    const members: ProposalMemberItem[] = memRes.rows.map((m) => ({
-      id: m.id,
-      studentId: m.studentId,
-      name: `${m.firstName} ${m.lastName}`,
-      email: m.email,
-      rollNumber: m.rollNumber,
-      semester: m.semester,
-      status: m.status,
-      isLead: m.studentId === row.submittedById,
-      joinedAt: toIsoString(m.joinedAt),
-    }));
-
     return {
-      id: row.id,
-      title: row.title,
-      abstract: row.abstract,
-      domain: row.domain,
-      techStack: Array.isArray(row.techStack) ? row.techStack : [],
+      id: prop.id,
+      title: prop.title,
+      abstract: prop.abstract,
+      domain: prop.domain,
+      techStack: Array.isArray(prop.techStack) ? prop.techStack : [],
       submittedBy: {
-        id: row.submittedById,
-        name: `${row.subFirstName} ${row.subLastName}`,
-        email: row.subEmail,
-        rollNumber: row.subRollNumber,
-        departmentCode: row.subDeptCode || 'AIDS',
+        id: prop.submittedBy,
+        name: submitter ? `${submitter.firstName} ${submitter.lastName}` : 'Student',
+        email: submitter?.email || '',
+        rollNumber: submitter?.studentProfile?.rollNumber || '',
+        departmentCode: subDept?.code || 'AIDS',
       },
-      assignedFaculty: row.assignedFacultyId
-        ? {
-            id: row.assignedFacultyId,
-            name: `${row.facFirstName} ${row.facLastName}`,
-            email: row.facEmail,
-            designation: row.facDesignation || 'Faculty Advisor',
-            departmentCode: row.facDeptCode || 'AIDS',
-          }
-        : null,
-      status: row.status,
-      facultyComments: row.facultyComments,
-      version: row.version,
-      academicYear: row.academicYear,
-      createdAt: toIsoString(row.createdAt),
-      updatedAt: toIsoString(row.updatedAt),
+      assignedFaculty,
+      status: prop.status,
+      facultyComments: prop.facultyComments || null,
+      version: prop.version,
+      academicYear: prop.academicYear,
+      createdAt: toIsoString(prop.createdAt),
+      updatedAt: toIsoString(prop.updatedAt),
       members,
-      projectId: row.projectId || null,
+      projectId: project ? project.id : prop.projectId || null,
     };
   }
 
@@ -346,55 +326,28 @@ export class ProposalService {
     studentUserId: string,
     input: UpdateProposalInput
   ): Promise<ProposalDetail> {
-    const existing = await query(
-      `SELECT submitted_by, status, version FROM proposals WHERE id = $1`,
-      [proposalId]
-    );
-
-    if (existing.rows.length === 0) {
+    const prop = await Proposal.findById(proposalId);
+    if (!prop) {
       throw ApiError.notFound('Proposal not found');
     }
 
-    const row = existing.rows[0];
-    if (row.submitted_by !== studentUserId) {
+    if (prop.submittedBy !== studentUserId) {
       throw ApiError.forbidden('Only the student team lead who authored this proposal can modify it.');
     }
 
-    if (row.status !== 'DRAFT' && row.status !== 'CHANGES_REQUESTED') {
+    if (prop.status !== 'DRAFT' && prop.status !== 'CHANGES_REQUESTED') {
       throw ApiError.badRequest(
-        `Cannot edit proposal in "${row.status}" status. Modifications are only permitted during DRAFT or CHANGES_REQUESTED stages.`
+        `Cannot edit proposal in "${prop.status}" status. Modifications are only permitted during DRAFT or CHANGES_REQUESTED stages.`
       );
     }
 
-    // Build update parameters
-    const updates: string[] = ['updated_at = CURRENT_TIMESTAMP'];
-    const params: unknown[] = [proposalId];
+    if (input.title !== undefined) prop.title = input.title;
+    if (input.abstract !== undefined) prop.abstract = input.abstract;
+    if (input.domain !== undefined) prop.domain = input.domain;
+    if (input.techStack !== undefined) prop.techStack = input.techStack;
+    if (input.assignedFacultyId !== undefined) prop.assignedFacultyId = input.assignedFacultyId || undefined;
 
-    if (input.title !== undefined) {
-      params.push(input.title);
-      updates.push(`title = $${params.length}`);
-    }
-    if (input.abstract !== undefined) {
-      params.push(input.abstract);
-      updates.push(`abstract = $${params.length}`);
-    }
-    if (input.domain !== undefined) {
-      params.push(input.domain);
-      updates.push(`domain = $${params.length}`);
-    }
-    if (input.techStack !== undefined) {
-      params.push(input.techStack);
-      updates.push(`tech_stack = $${params.length}`);
-    }
-    if (input.assignedFacultyId !== undefined) {
-      params.push(input.assignedFacultyId);
-      updates.push(`assigned_faculty_id = $${params.length}`);
-    }
-
-    await query(
-      `UPDATE proposals SET ${updates.join(', ')} WHERE id = $1`,
-      params
-    );
+    await prop.save();
 
     logger.info(`[ProposalService] Proposal ${proposalId} updated by student ${studentUserId}`);
     return this.getProposalById(proposalId);
@@ -404,60 +357,43 @@ export class ProposalService {
    * Submit / Resubmit proposal for faculty review
    */
   async submitProposal(proposalId: string, studentUserId: string): Promise<ProposalDetail> {
-    const existing = await query(
-      `SELECT submitted_by, status, assigned_faculty_id, version FROM proposals WHERE id = $1`,
-      [proposalId]
-    );
-
-    if (existing.rows.length === 0) {
+    const prop = await Proposal.findById(proposalId);
+    if (!prop) {
       throw ApiError.notFound('Proposal not found');
     }
 
-    const row = existing.rows[0];
-    if (row.submitted_by !== studentUserId) {
+    if (prop.submittedBy !== studentUserId) {
       throw ApiError.forbidden('Only the student team lead can submit this proposal.');
     }
 
-    if (row.status !== 'DRAFT' && row.status !== 'CHANGES_REQUESTED') {
-      throw ApiError.badRequest(`Proposal cannot be submitted from current status "${row.status}".`);
+    if (prop.status !== 'DRAFT' && prop.status !== 'CHANGES_REQUESTED') {
+      throw ApiError.badRequest(`Proposal cannot be submitted from current status "${prop.status}".`);
     }
 
     // Verify team members satisfy minimum threshold
     const settings = await this.getSystemSettings();
-    const acceptedMemRes = await query(
-      `SELECT COUNT(id) AS count FROM proposal_members WHERE proposal_id = $1 AND status = 'ACCEPTED'`,
-      [proposalId]
-    );
-    const acceptedCount = parseInt(acceptedMemRes.rows[0]?.count || '1', 10);
+    const acceptedCount = (prop.members || []).filter((m) => m.status === 'ACCEPTED').length;
     if (acceptedCount < settings.minTeamSize) {
       throw ApiError.badRequest(
         `Proposal requires at least ${settings.minTeamSize} confirmed team member(s). Currently confirmed: ${acceptedCount}.`
       );
     }
 
-    // If resubmitting from CHANGES_REQUESTED, bump version
-    const newVersion = row.status === 'CHANGES_REQUESTED' ? row.version + 1 : row.version;
-    const nextStatus = row.assigned_faculty_id ? 'UNDER_REVIEW' : 'SUBMITTED';
+    const isResubmission = prop.status === 'CHANGES_REQUESTED';
+    const newVersion = isResubmission ? prop.version + 1 : prop.version;
+    const nextStatus = prop.assignedFacultyId ? 'UNDER_REVIEW' : 'SUBMITTED';
 
-    await query(
-      `UPDATE proposals 
-       SET status = $1, version = $2, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $3`,
-      [nextStatus, newVersion, proposalId]
-    );
+    prop.status = nextStatus;
+    prop.version = newVersion;
+    await prop.save();
 
-    // Audit log
-    await query(
-      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [
-        studentUserId,
-        row.status === 'CHANGES_REQUESTED' ? 'PROPOSAL_RESUBMITTED' : 'PROPOSAL_SUBMITTED',
-        'PROPOSAL',
-        proposalId,
-        JSON.stringify({ newVersion, nextStatus }),
-      ]
-    );
+    await AuditLog.create({
+      userId: studentUserId,
+      action: isResubmission ? 'PROPOSAL_RESUBMITTED' : 'PROPOSAL_SUBMITTED',
+      entityType: 'PROPOSAL',
+      entityId: proposalId,
+      details: { newVersion, nextStatus },
+    });
 
     logger.info(`[ProposalService] Proposal ${proposalId} submitted by student ${studentUserId} (Status: ${nextStatus}, v${newVersion})`);
     return this.getProposalById(proposalId);
@@ -486,24 +422,17 @@ export class ProposalService {
       throw ApiError.badRequest('Proposal has already been approved and active project instantiated.');
     }
 
-    // Determine the faculty guide ID
     const guideId = prop.assignedFaculty?.id || evaluatorUserId;
 
     if (input.status === 'APPROVED') {
       // 1. Check Faculty Supervising Capacity Quota
-      const facRes = await query(
-        `SELECT max_projects FROM faculty WHERE user_id = $1`,
-        [guideId]
-      );
-      const maxQuota = facRes.rows[0]?.max_projects ?? 5;
+      const facUser = await User.findById(guideId);
+      const maxQuota = facUser?.facultyProfile?.maxProjects ?? 5;
 
-      const assignedRes = await query(
-        `SELECT COUNT(id) AS count 
-         FROM projects 
-         WHERE faculty_guide_id = $1 AND status NOT IN ('COMPLETED', 'ARCHIVED')`,
-        [guideId]
-      );
-      const currentlyAssigned = parseInt(assignedRes.rows[0]?.count || '0', 10);
+      const currentlyAssigned = await Project.countDocuments({
+        facultyGuideId: guideId,
+        status: { $nin: ['COMPLETED', 'ARCHIVED'] },
+      });
 
       if (currentlyAssigned >= maxQuota) {
         throw ApiError.badRequest(
@@ -512,106 +441,125 @@ export class ProposalService {
       }
 
       // 2. Atomic Auto-Instantiation Transaction
-      const instantiatedProjectId = await transaction(async (client) => {
+      const instantiatedProjectId = await withMongoTransaction(async (session) => {
         // A. Update proposal to APPROVED
-        await client.query(
-          `UPDATE proposals 
-           SET status = 'APPROVED', faculty_comments = $1, assigned_faculty_id = $2, updated_at = CURRENT_TIMESTAMP
-           WHERE id = $3`,
-          [input.facultyComments, guideId, proposalId]
-        );
+        const propDoc = await Proposal.findById(proposalId).session(session);
+        if (!propDoc) throw ApiError.notFound('Proposal not found');
 
-        // B. Insert into projects
-        const projRes = await client.query(
-          `INSERT INTO projects (
-            proposal_id, title, abstract, domain, faculty_guide_id, status, overall_progress
-          ) VALUES ($1, $2, $3, $4, $5, 'ALLOCATED', 0)
-          RETURNING id`,
-          [proposalId, prop.title, prop.abstract, prop.domain, guideId]
-        );
-        const newProjectId = projRes.rows[0].id;
+        propDoc.status = 'APPROVED';
+        propDoc.facultyComments = input.facultyComments;
+        propDoc.assignedFacultyId = guideId;
+        await propDoc.save({ session });
 
-        // C. Populate project_members from accepted proposal_members
-        for (const m of prop.members) {
-          if (m.status === 'ACCEPTED') {
-            const roleInProject = m.studentId === prop.submittedBy.id ? 'LEAD' : 'MEMBER';
-            await client.query(
-              `INSERT INTO project_members (project_id, student_id, role_in_project)
-               VALUES ($1, $2, $3)`,
-              [newProjectId, m.studentId, roleInProject]
-            );
-          }
-        }
+        // B. Populate team members from accepted proposal members
+        const teamMembers = prop.members
+          .filter((m) => m.status === 'ACCEPTED')
+          .map((m) => ({
+            _id: crypto.randomUUID(),
+            studentId: m.studentId,
+            roleInProject: (m.studentId === prop.submittedBy.id ? 'LEAD' : 'MEMBER') as 'LEAD' | 'MEMBER',
+            joinedAt: new Date(),
+          }));
 
-        // D. Instantiate 5 Standard Milestone Gates
+        // C. Instantiate 5 Standard Milestone Gates
         const now = new Date();
-        const addDays = (d: Date, days: number): string => {
+        const addDays = (d: Date, days: number): Date => {
           const t = new Date(d);
           t.setDate(t.getDate() + days);
-          return t.toISOString().substring(0, 10);
+          return t;
         };
 
         const standardMilestones = [
           {
-            num: 1,
+            _id: crypto.randomUUID(),
+            milestoneNumber: 1,
             title: 'Requirement Analysis & Literature Review',
-            desc: 'System Requirement Specification (SRS), formal domain feasibility study, and literature survey benchmark.',
-            start: addDays(now, 0),
-            due: addDays(now, 30),
+            description: 'System Requirement Specification (SRS), formal domain feasibility study, and literature survey benchmark.',
+            startDate: addDays(now, 0),
+            dueDate: addDays(now, 30),
+            status: 'PENDING' as const,
+            completionPercentage: 0,
           },
           {
-            num: 2,
+            _id: crypto.randomUUID(),
+            milestoneNumber: 2,
             title: 'System Architecture & Detailed Design',
-            desc: 'Comprehensive architectural blueprint, database relational modeling, and API contract specifications.',
-            start: addDays(now, 30),
-            due: addDays(now, 60),
+            description: 'Comprehensive architectural blueprint, database relational modeling, and API contract specifications.',
+            startDate: addDays(now, 30),
+            dueDate: addDays(now, 60),
+            status: 'PENDING' as const,
+            completionPercentage: 0,
           },
           {
-            num: 3,
+            _id: crypto.randomUUID(),
+            milestoneNumber: 3,
             title: 'Core Module Implementation & Integration',
-            desc: 'Algorithmic development, neural model training or core service pipeline, and full-stack API integration.',
-            start: addDays(now, 60),
-            due: addDays(now, 105),
+            description: 'Algorithmic development, neural model training or core service pipeline, and full-stack API integration.',
+            startDate: addDays(now, 60),
+            dueDate: addDays(now, 105),
+            status: 'PENDING' as const,
+            completionPercentage: 0,
           },
           {
-            num: 4,
+            _id: crypto.randomUUID(),
+            milestoneNumber: 4,
             title: 'Testing, Benchmarking & Performance Optimization',
-            desc: 'System integration verification, accuracy benchmarking, latency profiling, and unit/regression test execution.',
-            start: addDays(now, 105),
-            due: addDays(now, 135),
+            description: 'System integration verification, accuracy benchmarking, latency profiling, and unit/regression test execution.',
+            startDate: addDays(now, 105),
+            dueDate: addDays(now, 135),
+            status: 'PENDING' as const,
+            completionPercentage: 0,
           },
           {
-            num: 5,
+            _id: crypto.randomUUID(),
+            milestoneNumber: 5,
             title: 'Final Thesis Documentation & Viva Defense',
-            desc: 'Complete capstone documentation, presentation deck preparation, code repository archiving, and final viva voce.',
-            start: addDays(now, 135),
-            due: addDays(now, 160),
+            description: 'Complete capstone documentation, presentation deck preparation, code repository archiving, and final viva voce.',
+            startDate: addDays(now, 135),
+            dueDate: addDays(now, 160),
+            status: 'PENDING' as const,
+            completionPercentage: 0,
           },
         ];
 
-        for (const m of standardMilestones) {
-          await client.query(
-            `INSERT INTO milestones (
-              project_id, milestone_number, title, description, start_date, due_date, status, completion_percentage
-            ) VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', 0)`,
-            [newProjectId, m.num, m.title, m.desc, m.start, m.due]
-          );
-        }
+        // D. Create Project
+        const newProject = new Project({
+          proposalId: propDoc.id,
+          title: propDoc.title,
+          abstract: propDoc.abstract,
+          domain: propDoc.domain,
+          facultyGuideId: guideId,
+          status: 'ALLOCATED',
+          overallProgress: 0,
+          teamMembers,
+          milestones: standardMilestones,
+        });
+
+        await newProject.save({ session });
+
+        // Update proposal with linked project id
+        propDoc.projectId = newProject.id;
+        await propDoc.save({ session });
 
         // E. Audit log
-        await client.query(
-          `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
-           VALUES ($1, $2, $3, $4, $5)`,
+        await AuditLog.create(
           [
-            evaluatorUserId,
-            'PROPOSAL_APPROVED_AND_PROJECT_ALLOCATED',
-            'PROJECT',
-            newProjectId,
-            JSON.stringify({ proposalId, guideId, membersCount: prop.members.filter((m) => m.status === 'ACCEPTED').length }),
-          ]
+            {
+              userId: evaluatorUserId,
+              action: 'PROPOSAL_APPROVED_AND_PROJECT_ALLOCATED',
+              entityType: 'PROJECT',
+              entityId: newProject.id,
+              details: {
+                proposalId,
+                guideId,
+                membersCount: teamMembers.length,
+              },
+            },
+          ],
+          { session }
         );
 
-        return newProjectId;
+        return newProject.id;
       });
 
       logger.info(`[ProposalService] Proposal ${proposalId} APPROVED by ${evaluatorUserId}. Instantiated active project ${instantiatedProjectId}`);
@@ -620,25 +568,20 @@ export class ProposalService {
     }
 
     // For CHANGES_REQUESTED or REJECTED
-    await query(
-      `UPDATE proposals 
-       SET status = $1, faculty_comments = $2, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3`,
-      [input.status, input.facultyComments, proposalId]
-    );
+    const propDoc = await Proposal.findById(proposalId);
+    if (!propDoc) throw ApiError.notFound('Proposal not found');
 
-    // Audit log
-    await query(
-      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [
-        evaluatorUserId,
-        `PROPOSAL_${input.status}`,
-        'PROPOSAL',
-        proposalId,
-        JSON.stringify({ comments: input.facultyComments }),
-      ]
-    );
+    propDoc.status = input.status;
+    propDoc.facultyComments = input.facultyComments;
+    await propDoc.save();
+
+    await AuditLog.create({
+      userId: evaluatorUserId,
+      action: `PROPOSAL_${input.status}`,
+      entityType: 'PROPOSAL',
+      entityId: proposalId,
+      details: { comments: input.facultyComments },
+    });
 
     logger.info(`[ProposalService] Proposal ${proposalId} evaluated as ${input.status} by ${evaluatorUserId}`);
     const updatedProp = await this.getProposalById(proposalId);
@@ -653,9 +596,10 @@ export class ProposalService {
     requesterUserId: string,
     newStudentId: string
   ): Promise<ProposalDetail> {
-    const prop = await this.getProposalById(proposalId);
+    const prop = await Proposal.findById(proposalId);
+    if (!prop) throw ApiError.notFound('Proposal not found');
 
-    if (prop.submittedBy.id !== requesterUserId) {
+    if (prop.submittedBy !== requesterUserId) {
       throw ApiError.forbidden('Only the student team lead can invite members to this proposal.');
     }
 
@@ -664,11 +608,8 @@ export class ProposalService {
     }
 
     // Check student validity
-    const studentRes = await query(
-      `SELECT user_id FROM students WHERE user_id = $1`,
-      [newStudentId]
-    );
-    if (studentRes.rows.length === 0) {
+    const student = await User.findOne({ _id: newStudentId, role: 'STUDENT' });
+    if (!student) {
       throw ApiError.badRequest('Target candidate is not an enrolled student.');
     }
 
@@ -686,10 +627,15 @@ export class ProposalService {
       throw ApiError.badRequest('This student is already a member or invited to this proposal.');
     }
 
-    await query(
-      `INSERT INTO proposal_members (proposal_id, student_id, status) VALUES ($1, $2, 'INVITED')`,
-      [proposalId, newStudentId]
-    );
+    prop.members.push({
+      _id: crypto.randomUUID(),
+      studentId: newStudentId,
+      status: 'INVITED',
+      isLead: false,
+      joinedAt: new Date(),
+    });
+
+    await prop.save();
 
     logger.info(`[ProposalService] Student ${newStudentId} invited to proposal ${proposalId}`);
     return this.getProposalById(proposalId);
@@ -703,19 +649,16 @@ export class ProposalService {
     studentUserId: string,
     decision: 'ACCEPTED' | 'DECLINED'
   ): Promise<ProposalDetail> {
-    const memberRes = await query(
-      `SELECT id, status FROM proposal_members WHERE proposal_id = $1 AND student_id = $2`,
-      [proposalId, studentUserId]
-    );
+    const prop = await Proposal.findById(proposalId);
+    if (!prop) throw ApiError.notFound('Proposal not found');
 
-    if (memberRes.rows.length === 0) {
+    const member = prop.members.find((m) => m.studentId === studentUserId);
+    if (!member) {
       throw ApiError.notFound('Invitation record not found for this proposal.');
     }
 
-    await query(
-      `UPDATE proposal_members SET status = $1 WHERE proposal_id = $2 AND student_id = $3`,
-      [decision, proposalId, studentUserId]
-    );
+    member.status = decision;
+    await prop.save();
 
     logger.info(`[ProposalService] Student ${studentUserId} responded ${decision} to proposal ${proposalId}`);
     return this.getProposalById(proposalId);
@@ -729,16 +672,17 @@ export class ProposalService {
     requesterUserId: string,
     targetStudentId: string
   ): Promise<ProposalDetail> {
-    const prop = await this.getProposalById(proposalId);
+    const prop = await Proposal.findById(proposalId);
+    if (!prop) throw ApiError.notFound('Proposal not found');
 
-    const isLead = prop.submittedBy.id === requesterUserId;
+    const isLead = prop.submittedBy === requesterUserId;
     const isSelf = requesterUserId === targetStudentId;
 
     if (!isLead && !isSelf) {
       throw ApiError.forbidden('You do not have permission to remove this member.');
     }
 
-    if (targetStudentId === prop.submittedBy.id) {
+    if (targetStudentId === prop.submittedBy) {
       throw ApiError.badRequest('The student team lead cannot be removed from their own proposal.');
     }
 
@@ -746,10 +690,8 @@ export class ProposalService {
       throw ApiError.badRequest('Members can only be removed while proposal is in DRAFT or CHANGES_REQUESTED.');
     }
 
-    await query(
-      `DELETE FROM proposal_members WHERE proposal_id = $1 AND student_id = $2`,
-      [proposalId, targetStudentId]
-    );
+    prop.members = prop.members.filter((m) => m.studentId !== targetStudentId);
+    await prop.save();
 
     logger.info(`[ProposalService] Student ${targetStudentId} removed from proposal ${proposalId}`);
     return this.getProposalById(proposalId);
@@ -759,97 +701,66 @@ export class ProposalService {
    * Get active project details
    */
   async getProjectById(projectId: string): Promise<unknown> {
-    const projRes = await query(
-      `SELECT 
-        p.id, p.proposal_id AS "proposalId", p.title, p.abstract, p.domain,
-        p.faculty_guide_id AS "facultyGuideId",
-        fac_u.first_name AS "facFirstName", fac_u.last_name AS "facLastName", fac_u.email AS "facEmail",
-        fac.designation AS "facDesignation", fac_d.code AS "facDeptCode",
-        p.status, p.overall_progress AS "overallProgress", p.repository_url AS "repositoryUrl",
-        p.created_at AS "createdAt", p.updated_at AS "updatedAt"
-      FROM projects p
-      JOIN users fac_u ON p.faculty_guide_id = fac_u.id
-      JOIN faculty fac ON fac_u.id = fac.user_id
-      LEFT JOIN departments fac_d ON fac_u.department_id = fac_d.id
-      WHERE p.id = $1`,
-      [projectId]
-    );
-
-    if (projRes.rows.length === 0) {
+    const project = await Project.findById(projectId);
+    if (!project) {
       throw ApiError.notFound(`Project with ID ${projectId} not found.`);
     }
 
-    const row = projRes.rows[0];
+    const guide = await User.findById(project.facultyGuideId);
+    const guideDept = guide?.departmentId ? await Department.findById(guide.departmentId) : null;
 
-    // Members
-    const memRes = await query(
-      `SELECT 
-        pm.id, pm.student_id AS "studentId", pm.role_in_project AS "roleInProject", pm.joined_at AS "joinedAt",
-        u.first_name AS "firstName", u.last_name AS "lastName", u.email,
-        s.roll_number AS "rollNumber", s.semester
-      FROM project_members pm
-      JOIN users u ON pm.student_id = u.id
-      JOIN students s ON u.id = s.user_id
-      WHERE pm.project_id = $1
-      ORDER BY pm.role_in_project DESC, u.first_name ASC`,
-      [projectId]
+    const members = await Promise.all(
+      (project.teamMembers || []).map(async (pm, idx) => {
+        const u = await User.findById(pm.studentId);
+        return {
+          id: pm._id ? String(pm._id) : idx + 1,
+          studentId: pm.studentId,
+          name: u ? `${u.firstName} ${u.lastName}` : 'Student',
+          email: u?.email || '',
+          rollNumber: u?.studentProfile?.rollNumber || '',
+          semester: u?.studentProfile?.semester || 1,
+          roleInProject: pm.roleInProject,
+          joinedAt: toIsoString(pm.joinedAt),
+        };
+      })
     );
 
-    // Milestones
-    const mileRes = await query(
-      `SELECT 
-        id, milestone_number AS "milestoneNumber", title, description,
-        start_date AS "startDate", due_date AS "dueDate",
-        completion_percentage AS "completionPercentage", status,
-        student_remarks AS "studentRemarks", faculty_remarks AS "facultyRemarks",
-        completed_at AS "completedAt"
-      FROM milestones
-      WHERE project_id = $1
-      ORDER BY milestone_number ASC`,
-      [projectId]
-    );
-
-    return {
-      id: row.id,
-      proposalId: row.proposalId,
-      title: row.title,
-      abstract: row.abstract,
-      domain: row.domain,
-      facultyGuide: {
-        id: row.facultyGuideId,
-        name: `${row.facFirstName} ${row.facLastName}`,
-        email: row.facEmail,
-        designation: row.facDesignation,
-        departmentCode: row.facDeptCode || 'AIDS',
-      },
-      status: row.status,
-      overallProgress: row.overallProgress,
-      repositoryUrl: row.repositoryUrl,
-      createdAt: toIsoString(row.createdAt),
-      updatedAt: toIsoString(row.updatedAt),
-      members: memRes.rows.map((m) => ({
-        id: m.id,
-        studentId: m.studentId,
-        name: `${m.firstName} ${m.lastName}`,
-        email: m.email,
-        rollNumber: m.rollNumber,
-        semester: m.semester,
-        roleInProject: m.roleInProject,
-        joinedAt: toIsoString(m.joinedAt),
-      })),
-      milestones: mileRes.rows.map((m) => ({
-        id: m.id,
+    const milestones = (project.milestones || [])
+      .sort((a, b) => a.milestoneNumber - b.milestoneNumber)
+      .map((m) => ({
+        id: m._id ? String(m._id) : String(m.milestoneNumber),
         milestoneNumber: m.milestoneNumber,
         title: m.title,
         description: m.description,
         startDate: toDateString(m.startDate),
         dueDate: toDateString(m.dueDate),
-        completionPercentage: m.completionPercentage,
+        completionPercentage: m.completionPercentage || 0,
         status: m.status,
-        studentRemarks: m.studentRemarks,
-        facultyRemarks: m.facultyRemarks,
-        completedAt: toIsoString(m.completedAt),
-      })),
+        studentRemarks: m.studentRemarks || null,
+        facultyRemarks: m.facultyRemarks || null,
+        completedAt: m.completedAt ? toIsoString(m.completedAt) : null,
+      }));
+
+    return {
+      id: project.id,
+      proposalId: project.proposalId,
+      title: project.title,
+      abstract: project.abstract,
+      domain: project.domain,
+      facultyGuide: {
+        id: guide?.id || '',
+        name: guide ? `${guide.firstName} ${guide.lastName}` : 'Unassigned',
+        email: guide?.email || '',
+        designation: guide?.facultyProfile?.designation || 'Faculty Supervisor',
+        departmentCode: guideDept?.code || 'AIDS',
+      },
+      status: project.status,
+      overallProgress: project.overallProgress || 0,
+      repositoryUrl: project.repositoryUrl || null,
+      createdAt: toIsoString(project.createdAt),
+      updatedAt: toIsoString(project.updatedAt),
+      members,
+      milestones,
     };
   }
 
@@ -862,28 +773,24 @@ export class ProposalService {
     userRole: string,
     repositoryUrl: string
   ): Promise<void> {
+    const project = await Project.findById(projectId);
+    if (!project) {
+      throw ApiError.notFound('Project not found');
+    }
+
     if (userRole === 'STUDENT') {
-      const memRes = await query(
-        `SELECT id FROM project_members WHERE project_id = $1 AND student_id = $2`,
-        [projectId, userId]
-      );
-      if (memRes.rows.length === 0) {
+      const isMember = (project.teamMembers || []).some((m) => m.studentId === userId);
+      if (!isMember) {
         throw ApiError.forbidden('Only allocated team members can update the project repository URL.');
       }
     } else if (userRole === 'FACULTY') {
-      const facRes = await query(
-        `SELECT id FROM projects WHERE id = $1 AND faculty_guide_id = $2`,
-        [projectId, userId]
-      );
-      if (facRes.rows.length === 0) {
+      if (project.facultyGuideId !== userId) {
         throw ApiError.forbidden('Only the assigned faculty supervisor can update project settings.');
       }
     }
 
-    await query(
-      `UPDATE projects SET repository_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-      [repositoryUrl, projectId]
-    );
+    project.repositoryUrl = repositoryUrl;
+    await project.save();
 
     logger.info(`[ProposalService] Project ${projectId} repository URL updated to "${repositoryUrl}" by user ${userId}`);
   }

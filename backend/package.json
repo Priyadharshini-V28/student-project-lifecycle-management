@@ -4,19 +4,20 @@
   "description": "Student Project Lifecycle Management Platform — Backend API Service",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only --exit-child src/server.ts",
-    "build": "rimraf dist && tsc && node -e \"const fs = require('fs'); fs.mkdirSync('dist/db/migrations', { recursive: true }); fs.copyFileSync('src/db/migrations/001_create_tables.sql', 'dist/db/migrations/001_create_tables.sql'); fs.copyFileSync('src/db/migrations/002_seed_data.sql', 'dist/db/migrations/002_seed_data.sql');\"",
+    "dev": "tsx watch src/server.ts",
+    "build": "rimraf dist && tsc",
     "start": "node dist/server.js",
-    "db:migrate": "ts-node-dev --transpile-only src/db/migrate.ts",
-    "db:seed": "ts-node-dev --transpile-only src/db/seed.ts",
-    "db:setup": "ts-node-dev --transpile-only src/db/migrate.ts && ts-node-dev --transpile-only src/db/seed.ts",
-    "db:verify": "ts-node-dev --transpile-only src/db/verify_schema.ts",
-    "test:auth": "ts-node-dev --transpile-only src/db/test_auth.ts",
-    "test:profile": "ts-node-dev --transpile-only src/db/test_profile.ts",
-    "test:student-dashboard": "ts-node-dev --transpile-only src/db/test_student_dashboard.ts",
-    "test:faculty-dashboard": "ts-node-dev --transpile-only src/db/test_faculty_dashboard.ts",
-    "test:proposals": "ts-node-dev --transpile-only src/db/test_proposals.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed": "tsx src/db/seed.ts",
+    "db:setup": "tsx src/db/seed.ts",
+    "db:verify": "tsx src/db/verify_schema.ts",
+    "test:auth": "tsx src/db/test_auth.ts",
+    "test:profile": "tsx src/db/test_profile.ts",
+    "test:student-dashboard": "tsx src/db/test_student_dashboard.ts",
+    "test:faculty-dashboard": "tsx src/db/test_faculty_dashboard.ts",
+    "test:proposals": "tsx src/db/test_proposals.ts",
+    "test:all": "tsx src/db/test_auth.ts && tsx src/db/test_profile.ts && tsx src/db/test_student_dashboard.ts && tsx src/db/test_faculty_dashboard.ts && tsx src/db/test_proposals.ts",
+    "test": "npm run test:all"
   },
   "keywords": [
     "education",
@@ -37,6 +38,7 @@
     "helmet": "^8.0.0",
     "ioredis": "^5.4.2",
     "jsonwebtoken": "^9.0.2",
+    "mongoose": "^9.10.2",
     "pg": "^8.13.1",
     "zod": "^3.24.1"
   },
@@ -48,9 +50,11 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.2",
     "@types/pg": "^8.11.10",
+    "mongodb-memory-server": "^11.3.0",
     "pg-mem": "^3.0.14",
     "rimraf": "^6.0.1",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }
 }
