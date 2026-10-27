@@ -1,101 +1,87 @@
 import mongoose from 'mongoose';
-import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 import { seedMongoData } from './seed_mongo';
 import { User } from '../models';
 
-let memReplSet: MongoMemoryReplSet | null = null;
 let isConnected = false;
 let supportsTransactions = false;
 
-/**
- * Connect to external MongoDB or fallback to MongoMemoryReplSet
- */
 export const connectMongo = async (): Promise<typeof mongoose> => {
   if (isConnected && mongoose.connection.readyState === 1) {
     return mongoose;
   }
 
-  // 1. Try external MongoDB
   try {
-    logger.info(`Connecting to external MongoDB at ${env.MONGODB_URI}...`);
+    logger.info('Connecting to MongoDB...');
     await mongoose.connect(env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 2000,
+      serverSelectionTimeoutMS: 10000,
     });
-    isConnected = true;
-    logger.info('Connected to live external MongoDB database.');
 
-    // Check if external deployment supports transactions (Replica Set or mongos)
+    isConnected = true;
+    logger.info('Connected to MongoDB successfully.');
+
     try {
-      const helloResult = await mongoose.connection.db?.admin().command({ hello: 1 });
-      supportsTransactions = Boolean(helloResult?.setName || helloResult?.msg === 'isdbgrid');
-      logger.info(`External MongoDB transaction support: ${supportsTransactions ? 'ENABLED (ReplSet)' : 'STANDALONE (Running in direct mode)'}`);
+      const hello = await mongoose.connection.db?.admin().command({ hello: 1 });
+      supportsTransactions = Boolean(hello?.setName || hello?.msg === 'isdbgrid');
     } catch {
       supportsTransactions = false;
     }
 
-    // Auto-seed if database is empty
-    const userCount = await User.countDocuments();
-    if (userCount === 0) {
-      logger.info('External MongoDB is empty. Seeding initial academic dataset...');
+    if (await User.countDocuments() === 0) {
+      logger.info('Database is empty. Seeding initial data...');
       await seedMongoData();
     }
 
     return mongoose;
-  } catch (err: any) {
-    logger.warn(`⚠️ External MongoDB not reachable (${err?.message || err}). Initializing In-Memory MongoDB Engine (ReplSet with Transaction Support)...`);
-  }
+  } catch (error) {
+    isConnected = false;
 
-  // 2. Fallback to In-Memory MongoDB ReplSet
-  if (!memReplSet) {
-    memReplSet = await MongoMemoryReplSet.create({
+    if (env.NODE_ENV === 'production') {
+      logger.error('MongoDB connection failed in production:', error);
+      throw error;
+    }
+
+    logger.warn('External MongoDB unavailable. Trying in-memory MongoDB...');
+
+    const { MongoMemoryReplSet } = await import('mongodb-memory-server');
+
+    const memoryServer = await MongoMemoryReplSet.create({
       replSet: { count: 1, storageEngine: 'wiredTiger' },
     });
+
+    await mongoose.connect(memoryServer.getUri());
+    isConnected = true;
+    supportsTransactions = true;
+
+    logger.info('In-memory MongoDB initialized.');
+    await seedMongoData();
+
+    return mongoose;
   }
-
-  const memUri = memReplSet.getUri();
-  await mongoose.connect(memUri);
-  isConnected = true;
-  supportsTransactions = true;
-  logger.info(`✅ In-Memory MongoDB initialized successfully at ${memUri}`);
-
-  // Seed academic data
-  await seedMongoData();
-
-  return mongoose;
 };
 
-/**
- * Disconnect from MongoDB and stop in-memory server if running
- */
 export const disconnectMongo = async (): Promise<void> => {
   if (mongoose.connection.readyState !== 0) {
     await mongoose.disconnect();
   }
-  if (memReplSet) {
-    await memReplSet.stop();
-    memReplSet = null;
-  }
+
   isConnected = false;
   supportsTransactions = false;
   logger.info('MongoDB disconnected.');
 };
 
-/**
- * Resilient Transaction Runner with Session Support
- */
 export const withMongoTransaction = async <T>(
   callback: (session: mongoose.ClientSession) => Promise<T>
 ): Promise<T> => {
   await connectMongo();
 
   if (!supportsTransactions) {
-    // Execute directly without transaction session on standalone MongoDB deployments
-    return await callback(undefined as any);
+    return callback(undefined as any);
   }
 
   const session = await mongoose.startSession();
+
   try {
     session.startTransaction();
     const result = await callback(session);
