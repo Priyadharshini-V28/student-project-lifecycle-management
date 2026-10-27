@@ -78,13 +78,13 @@ student-project-management-system/
 
 The platform comes pre-seeded with realistic institutional accounts for end-to-end evaluation:
 
-| Role | Name | Email | Password | Access & Responsibilities |
-| :--- | :--- | :--- | :--- | :--- |
-| **Admin** | Dr. Aruna Swaminathan | `admin@splm.edu` | `SPLM@Admin2026` | Academic batches, project domains, supervisor capacity, department guide allocations. |
-| **Faculty** | Dr. Rajesh Kumar | `faculty1@splm.edu` | `Password@123` | Proposal review, milestone sign-offs, deliverable reviews, final viva rubric scoring. |
-| **Faculty** | Dr. Priya Sharma | `faculty2@splm.edu` | `Password@123` | Secondary supervisor, departmental project reviews, faculty capacity management. |
-| **Student** | Rahul Sharma | `student1@splm.edu` | `Password@123` | Team Lead (22AD001), proposal drafting/resubmission, milestone updates, document uploads. |
-| **Student** | Sneha Patel | `student2@splm.edu` | `Password@123` | Team Member (22AD002), milestone tracking, project deliverable access. |
+| Role | Name | Email | Access & Responsibilities |
+| :--- | :--- | :--- |  :--- |
+| **Admin** | Dr. Aruna Swaminathan | `admin@splm.edu` | Academic batches, project domains, supervisor capacity, department guide allocations. |
+| **Faculty** | Dr. Rajesh Kumar | `faculty1@splm.edu` | Proposal review, milestone sign-offs, deliverable reviews, final viva rubric scoring. |
+| **Faculty** | Dr. Priya Sharma | `faculty2@splm.edu` | Secondary supervisor, departmental project reviews, faculty capacity management. |
+| **Student** | Rahul Sharma | `student1@splm.edu` | Team Lead (22AD001), proposal drafting/resubmission, milestone updates, document uploads. |
+| **Student** | Sneha Patel | `student2@splm.edu` | Team Member (22AD002), milestone tracking, project deliverable access. |
 
 *Note: Public self-registration is strictly restricted to Students and Faculty. Administrator accounts cannot be created via the public registration endpoint.*
 
