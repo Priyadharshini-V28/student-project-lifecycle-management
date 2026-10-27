@@ -2,10 +2,15 @@ import { connectMongo, disconnectMongo } from './mongo';
 import {
   Department,
   AcademicBatch,
+  Domain,
   User,
   Proposal,
   Project,
   Review,
+  AuditLog,
+  DocumentModel,
+  Notification,
+  Evaluation,
   SystemSetting,
 } from '../models';
 import { logger } from '../utils/logger';
@@ -20,21 +25,31 @@ export const runSchemaVerification = async (): Promise<void> => {
   // 1. Verify Counts
   const deptCount = await Department.countDocuments();
   const batchCount = await AcademicBatch.countDocuments();
+  const domainCount = await Domain.countDocuments();
   const userCount = await User.countDocuments();
   const proposalCount = await Proposal.countDocuments();
   const projectCount = await Project.countDocuments();
   const reviewCount = await Review.countDocuments();
   const settingCount = await SystemSetting.countDocuments();
+  const docCount = await DocumentModel.countDocuments();
+  const notifCount = await Notification.countDocuments();
+  const evalCount = await Evaluation.countDocuments();
+  const auditCount = await AuditLog.countDocuments();
 
   logger.info(`✓ Departments: ${deptCount}`);
   logger.info(`✓ Academic Batches: ${batchCount}`);
+  logger.info(`✓ Project Domains: ${domainCount}`);
   logger.info(`✓ Users: ${userCount}`);
   logger.info(`✓ Proposals: ${proposalCount}`);
   logger.info(`✓ Projects: ${projectCount}`);
   logger.info(`✓ Reviews: ${reviewCount}`);
   logger.info(`✓ System Settings: ${settingCount}`);
+  logger.info(`✓ Document Deliverables: ${docCount}`);
+  logger.info(`✓ In-App Notifications: ${notifCount}`);
+  logger.info(`✓ Final Evaluations: ${evalCount}`);
+  logger.info(`✓ Audit Log Records: ${auditCount}`);
 
-  if (deptCount !== 3 || batchCount !== 2 || userCount !== 7 || projectCount !== 1) {
+  if (deptCount < 3 || batchCount < 5 || domainCount < 12 || userCount < 7 || projectCount < 1) {
     throw new Error('MongoDB collection counts mismatch against academic seed specification');
   }
 

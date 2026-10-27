@@ -31,6 +31,8 @@ export interface StudentDashboardDto {
     title: string;
     abstract: string;
     domain: string;
+    subjectCode?: string;
+    subjectName?: string;
     status: string;
     overallProgress: number;
     repositoryUrl: string | null;
@@ -51,6 +53,16 @@ export interface StudentDashboardDto {
       role: 'LEAD' | 'MEMBER';
     }>;
   } | null;
+  allProjects?: Array<{
+    id: string;
+    title: string;
+    domain: string;
+    status: string;
+    subjectCode: string;
+    subjectName: string;
+    overallProgress: number;
+    roleInProject: string;
+  }>;
   milestones: Array<{
     id: string;
     milestoneNumber: number;
@@ -172,6 +184,8 @@ export class StudentService {
         title: activeProjectDoc.title,
         abstract: activeProjectDoc.abstract,
         domain: activeProjectDoc.domain,
+        subjectCode: activeProjectDoc.subjectCode || 'CAPSTONE-01',
+        subjectName: activeProjectDoc.subjectName || 'Major Capstone Project',
         status: activeProjectDoc.status,
         overallProgress: activeProjectDoc.overallProgress || 0,
         repositoryUrl: activeProjectDoc.repositoryUrl || null,
@@ -270,6 +284,20 @@ export class StudentService {
 
     logger.debug(`[StudentDashboard] Aggregated metrics calculated for student ID: ${userId}`);
 
+    const allProjects = projects.map((p) => {
+      const role = p.teamMembers.find((m) => m.studentId === userId)?.roleInProject || 'MEMBER';
+      return {
+        id: p.id,
+        title: p.title,
+        domain: p.domain,
+        status: p.status,
+        subjectCode: p.subjectCode || 'CAPSTONE-01',
+        subjectName: p.subjectName || 'Major Capstone Project',
+        overallProgress: p.overallProgress || 0,
+        roleInProject: role,
+      };
+    });
+
     return {
       student: {
         id: student.id,
@@ -279,7 +307,7 @@ export class StudentService {
         rollNumber: student.studentProfile?.rollNumber || '',
         semester: student.studentProfile?.semester || 1,
         cgpa: student.studentProfile?.cgpa ? Number(student.studentProfile.cgpa) : 0.0,
-        batchName: batch?.name || '2022-2026 Batch',
+        batchName: batch?.name || 'Unassigned Batch',
         departmentCode: dept?.code || 'AIDS',
         departmentName: dept?.name || 'Department of Artificial Intelligence & Data Science',
       },
@@ -295,10 +323,44 @@ export class StudentService {
         proposalsCount: formattedProposals.length,
       },
       activeProject,
+      allProjects,
       milestones,
       latestReview,
       proposals: formattedProposals,
     };
+  }
+
+  /**
+   * Fetch active student directory for proposal co-member selection
+   */
+  async getStudentDirectory(callerUserId?: string, departmentId?: number): Promise<unknown[]> {
+    const query: Record<string, unknown> = {
+      role: 'STUDENT',
+      isActive: { $ne: false },
+    };
+
+    if (callerUserId) {
+      query._id = { $ne: callerUserId };
+    }
+    if (departmentId) {
+      query.departmentId = departmentId;
+    }
+
+    const students = await User.find(query).sort({ 'studentProfile.rollNumber': 1, lastName: 1 });
+    const batches = await AcademicBatch.find();
+    const batchMap = new Map(batches.map((b) => [b._id, b.name]));
+
+    return students.map((s) => ({
+      id: s.id,
+      name: `${s.firstName} ${s.lastName}`,
+      email: s.email,
+      rollNumber: s.studentProfile?.rollNumber || '',
+      semester: s.studentProfile?.semester || 1,
+      cgpa: s.studentProfile?.cgpa ? Number(s.studentProfile.cgpa) : 0,
+      batchId: s.studentProfile?.batchId,
+      batchName: s.studentProfile?.batchId ? batchMap.get(s.studentProfile.batchId) || 'Batch' : 'Batch',
+      departmentId: s.departmentId,
+    }));
   }
 }
 

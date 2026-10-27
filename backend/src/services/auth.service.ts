@@ -17,6 +17,11 @@ export class AuthService {
    * Register a new Student or Faculty account
    */
   async register(input: RegisterInput): Promise<{ tokens: AuthTokens; user: AuthenticatedUser }> {
+    // 0. Strict Admin Registration Guard: Admin cannot be registered via public endpoint
+    if ((input.role as string) === 'ADMIN') {
+      throw ApiError.forbidden('Administrator accounts cannot be registered through public registration.');
+    }
+
     // 1. Verify email uniqueness
     const existing = await User.findOne({ email: input.email.toLowerCase() });
     if (existing) {
@@ -247,7 +252,7 @@ export class AuthService {
         rollNumber: user.studentProfile?.rollNumber,
         semester: user.studentProfile?.semester,
         cgpa: user.studentProfile?.cgpa !== undefined ? Number(user.studentProfile.cgpa) : undefined,
-        batchName: batchName || '2022-2026 Batch',
+        batchName: batchName || 'Unassigned Batch',
         employeeId: user.facultyProfile?.employeeId,
         designation: user.facultyProfile?.designation,
         specialization: user.facultyProfile?.specialization,

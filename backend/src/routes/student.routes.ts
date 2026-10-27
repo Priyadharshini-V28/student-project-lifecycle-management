@@ -4,10 +4,13 @@ import { authenticate, requireRole } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// All student routes strictly require authentication and STUDENT role
+// All student routes require authentication
 router.use(authenticate);
-router.use(requireRole(['STUDENT']));
 
-router.get('/dashboard', studentController.getDashboard);
+// Student directory accessible to authenticated users (team creation, peer invitation)
+router.get('/list', studentController.getStudentList);
+
+// Personal student dashboard strictly requires STUDENT role
+router.get('/dashboard', requireRole(['STUDENT']), studentController.getDashboard);
 
 export default router;

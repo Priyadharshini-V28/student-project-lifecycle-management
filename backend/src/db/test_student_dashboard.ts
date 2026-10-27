@@ -3,9 +3,11 @@ import { requireRole } from '../middleware/auth.middleware';
 import { logger } from '../utils/logger';
 import { Request, Response, NextFunction } from 'express';
 import { connectMongo, disconnectMongo } from './mongo';
+import { seedMongoData } from './seed_mongo';
 
 export const runStudentDashboardTests = async (): Promise<void> => {
   await connectMongo();
+  await seedMongoData();
 
   logger.info('================================================================');
   logger.info('📊 STAGE 5: STUDENT DASHBOARD AGGREGATION & METRICS TEST SUITE');

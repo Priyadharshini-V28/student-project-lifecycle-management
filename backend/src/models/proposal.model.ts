@@ -14,6 +14,8 @@ export interface IProposal {
   title: string;
   abstract: string;
   domain: string;
+  subjectCode?: string;
+  subjectName?: string;
   techStack: string[];
   submittedBy: string;
   assignedFacultyId?: string;
@@ -56,6 +58,8 @@ const proposalSchema = new Schema<IProposal>(
     title: { type: String, required: true, trim: true },
     abstract: { type: String, required: true, trim: true },
     domain: { type: String, required: true, trim: true },
+    subjectCode: { type: String, trim: true, default: 'CAPSTONE-01', index: true },
+    subjectName: { type: String, trim: true, default: 'Major Capstone Project' },
     techStack: [{ type: String, trim: true }],
     submittedBy: { type: String, ref: 'User', required: true, index: true },
     assignedFacultyId: { type: String, ref: 'User', index: true },

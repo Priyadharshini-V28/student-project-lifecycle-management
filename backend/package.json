@@ -16,7 +16,14 @@
     "test:student-dashboard": "tsx src/db/test_student_dashboard.ts",
     "test:faculty-dashboard": "tsx src/db/test_faculty_dashboard.ts",
     "test:proposals": "tsx src/db/test_proposals.ts",
-    "test:all": "tsx src/db/test_auth.ts && tsx src/db/test_profile.ts && tsx src/db/test_student_dashboard.ts && tsx src/db/test_faculty_dashboard.ts && tsx src/db/test_proposals.ts",
+    "test:allocation": "tsx src/db/test_allocation.ts",
+    "test:refinements": "tsx src/db/test_refinements.ts",
+    "test:milestones": "tsx src/db/test_milestones.ts",
+    "test:documents": "tsx src/db/test_documents.ts",
+    "test:notifications": "tsx src/db/test_notifications.ts",
+    "test:evaluation": "tsx src/db/test_evaluation.ts",
+    "test:e2e": "tsx src/db/test_e2e_integration.ts",
+    "test:all": "tsx src/db/test_auth.ts && tsx src/db/test_profile.ts && tsx src/db/test_student_dashboard.ts && tsx src/db/test_faculty_dashboard.ts && tsx src/db/test_proposals.ts && tsx src/db/test_allocation.ts && tsx src/db/test_refinements.ts && tsx src/db/test_milestones.ts && tsx src/db/test_documents.ts && tsx src/db/test_notifications.ts && tsx src/db/test_evaluation.ts && tsx src/db/test_e2e_integration.ts",
     "test": "npm run test:all"
   },
   "keywords": [
@@ -30,6 +37,7 @@
   "author": "AIDS Department",
   "license": "ISC",
   "dependencies": {
+    "@types/multer": "^2.3.0",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -39,6 +47,7 @@
     "ioredis": "^5.4.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^9.10.2",
+    "multer": "^2.4.0",
     "pg": "^8.13.1",
     "zod": "^3.24.1"
   },

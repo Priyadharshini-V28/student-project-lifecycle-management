@@ -2,8 +2,9 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { z } from 'zod';
 
-// Load .env file explicitly
+// Load .env file explicitly (supports both backend/.env and current working directory .env)
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 const envSchema = z.object({
   PORT: z.coerce.number().default(5000),
@@ -11,7 +12,7 @@ const envSchema = z.object({
   CLIENT_URL: z.string().url().default('http://localhost:5173'),
 
   // MongoDB Configuration
-  MONGODB_URI: z.string().default('mongodb://localhost:27017/splm_db'),
+  MONGODB_URI: z.string().default('mongodb://127.0.0.1:27017/splm_db'),
 
   // PostgreSQL (retained for backward compatibility during migration)
   DB_HOST: z.string().default('localhost'),

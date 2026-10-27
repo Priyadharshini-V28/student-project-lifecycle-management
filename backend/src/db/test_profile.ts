@@ -3,10 +3,12 @@ import { authService } from '../services/auth.service';
 import { updateProfileSchema } from '../validators/user.validator';
 import { AuditLog } from '../models';
 import { connectMongo, disconnectMongo } from './mongo';
+import { seedMongoData } from './seed_mongo';
 import { logger } from '../utils/logger';
 
 export const runProfileTests = async (): Promise<void> => {
   await connectMongo();
+  await seedMongoData();
 
   logger.info('================================================================');
   logger.info('👤 STAGE 4: STUDENT & FACULTY PROFILES TEST SUITE');

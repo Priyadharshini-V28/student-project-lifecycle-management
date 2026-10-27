@@ -1,0 +1,112 @@
+services:
+  # ----------------------------------------------------------------------------
+  # MongoDB Primary Database Service
+  # ----------------------------------------------------------------------------
+  mongodb:
+    image: mongo:7.0
+    container_name: splm-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: splm_db
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - splm-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ----------------------------------------------------------------------------
+  # Redis Authoritative Session Store Service
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: splm-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - splm-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ----------------------------------------------------------------------------
+  # Backend API Server (Node.js / Express / TypeScript)
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: splm-backend
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+    environment:
+      PORT: 5000
+      NODE_ENV: production
+      CLIENT_URL: http://localhost:3000
+      MONGODB_URI: mongodb://mongodb:27017/splm_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-splm_production_jwt_access_secret_key_minimum_32_chars_2026}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-splm_production_jwt_refresh_secret_key_minimum_32_chars_2026}
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      UPLOAD_DIR: uploads
+      MAX_FILE_SIZE_MB: 25
+    volumes:
+      - uploads_data:/app/uploads
+    networks:
+      - splm-network
+
+  # ----------------------------------------------------------------------------
+  # Frontend Application (React / Vite / Nginx Reverse Proxy)
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: splm-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    networks:
+      - splm-network
+
+# ------------------------------------------------------------------------------
+# Persistent Volume Declarations
+# ------------------------------------------------------------------------------
+volumes:
+  mongodb_data:
+    name: splm_mongodb_data
+  redis_data:
+    name: splm_redis_data
+  uploads_data:
+    name: splm_uploads_data
+
+# ------------------------------------------------------------------------------
+# Isolated Bridge Network
+# ------------------------------------------------------------------------------
+networks:
+  splm-network:
+    name: splm_internal_network
+    driver: bridge

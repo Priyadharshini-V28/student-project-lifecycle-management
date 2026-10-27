@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { proposalsApi } from '../services/api';
-import { ProposalDetailDto, SystemSettingsDto } from '../types';
+import { proposalsApi, domainsApi, facultyApi, studentsApi } from '../services/api';
+import {
+  ProposalDetailDto,
+  SystemSettingsDto,
+  DomainDto,
+  FacultyListItemDto,
+  StudentListItemDto,
+} from '../types';
+import { FileText, AlertCircle } from 'lucide-react';
 
 interface CreateProposalModalProps {
   isOpen: boolean;
@@ -8,26 +15,19 @@ interface CreateProposalModalProps {
   onSuccess: (proposal: ProposalDetailDto) => void;
 }
 
-const PRESET_DOMAINS = [
-  'Artificial Intelligence & Healthcare',
-  'Natural Language Processing & LLMs',
-  'Computer Vision & Medical Imaging',
-  'Distributed Machine Learning & Federated Learning',
-  'Edge AI, Embedded Systems & IoT',
-  'Generative AI & Multimodal Systems',
-  'Cybersecurity & Threat Detection',
-  'Autonomous Robotics & Navigation',
+const FALLBACK_DOMAINS: DomainDto[] = [
+  { id: 'dom-1', name: 'Artificial Intelligence & Healthcare', description: '', isActive: true, createdAt: '' },
+  { id: 'dom-2', name: 'Natural Language Processing & LLMs', description: '', isActive: true, createdAt: '' },
+  { id: 'dom-3', name: 'Computer Vision & Medical Imaging', description: '', isActive: true, createdAt: '' },
+  { id: 'dom-4', name: 'Distributed Machine Learning & Federated Learning', description: '', isActive: true, createdAt: '' },
+  { id: 'dom-5', name: 'Edge AI, Embedded Systems & IoT', description: '', isActive: true, createdAt: '' },
+  { id: 'dom-6', name: 'Generative AI & Multimodal Systems', description: '', isActive: true, createdAt: '' },
+  { id: 'dom-7', name: 'Cybersecurity & Threat Detection', description: '', isActive: true, createdAt: '' },
+  { id: 'dom-8', name: 'Autonomous Robotics & Navigation', description: '', isActive: true, createdAt: '' },
 ];
 
-const AVAILABLE_FACULTY = [
-  { id: 'f0000000-0000-0000-0000-000000000001', name: 'Dr. Rajesh Kumar', designation: 'Associate Professor', dept: 'AIDS' },
-  { id: 'f0000000-0000-0000-0000-000000000002', name: 'Dr. Meenakshi Sundaram', designation: 'Professor & Head', dept: 'AIDS' },
-];
-
-const PEER_STUDENTS = [
-  { id: 'b0000000-0000-0000-0000-000000000002', name: 'Ananya Verma', rollNumber: '22AD002' },
-  { id: 'b0000000-0000-0000-0000-000000000003', name: 'Vikram Patel', rollNumber: '22AD003' },
-  { id: 'b0000000-0000-0000-0000-000000000004', name: 'Sneha Iyer', rollNumber: '22AD004' },
+const FALLBACK_FACULTY: FacultyListItemDto[] = [
+  { id: 'f0000000-0000-0000-0000-000000000001', name: 'Dr. Rajesh Kumar', designation: 'Associate Professor', departmentCode: 'AIDS', email: 'rajesh@splm.edu', specialization: 'Machine Learning', remainingCapacity: 3 },
 ];
 
 export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({
@@ -37,11 +37,19 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({
 }) => {
   const [title, setTitle] = useState('');
   const [abstract, setAbstract] = useState('');
-  const [domain, setDomain] = useState(PRESET_DOMAINS[0]);
+  const [subjectCode, setSubjectCode] = useState('CAPSTONE-01');
+  const [subjectName, setSubjectName] = useState('Major Capstone Project');
+
+  // Dynamic collections
+  const [domains, setDomains] = useState<DomainDto[]>(FALLBACK_DOMAINS);
+  const [facultyList, setFacultyList] = useState<FacultyListItemDto[]>(FALLBACK_FACULTY);
+  const [studentsList, setStudentsList] = useState<StudentListItemDto[]>([]);
+
+  const [domain, setDomain] = useState(FALLBACK_DOMAINS[0].name);
   const [techInput, setTechInput] = useState('');
   const [techStack, setTechStack] = useState<string[]>(['Python', 'PyTorch']);
-  const [assignedFacultyId, setAssignedFacultyId] = useState(AVAILABLE_FACULTY[0].id);
-  const [selectedPeers, setSelectedPeers] = useState<typeof PEER_STUDENTS>([]);
+  const [assignedFacultyId, setAssignedFacultyId] = useState('');
+  const [selectedPeers, setSelectedPeers] = useState<StudentListItemDto[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<SystemSettingsDto>({
@@ -52,8 +60,37 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      // 1. Settings
       proposalsApi.getSettings()
         .then((s) => setSettings(s))
+        .catch(() => {});
+
+      // 2. Dynamic Domains from MongoDB
+      domainsApi.getAll(true)
+        .then((data) => {
+          if (data && data.length > 0) {
+            setDomains(data);
+            setDomain(data[0].name);
+          }
+        })
+        .catch(() => {});
+
+      // 3. Dynamic Faculty Directory from MongoDB
+      facultyApi.getList()
+        .then((data) => {
+          if (data && data.length > 0) {
+            setFacultyList(data);
+          }
+        })
+        .catch(() => {});
+
+      // 4. Dynamic Students Directory from MongoDB
+      studentsApi.getList()
+        .then((data) => {
+          if (data && data.length > 0) {
+            setStudentsList(data);
+          }
+        })
         .catch(() => {});
     }
   }, [isOpen]);
@@ -82,7 +119,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({
     setTechStack(techStack.filter((t) => t !== tag));
   };
 
-  const handleTogglePeer = (peer: typeof PEER_STUDENTS[0]) => {
+  const handleTogglePeer = (peer: StudentListItemDto) => {
     if (selectedPeers.some((p) => p.id === peer.id)) {
       setSelectedPeers(selectedPeers.filter((p) => p.id !== peer.id));
       setError(null);
@@ -118,6 +155,8 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({
         title: title.trim(),
         abstract: abstract.trim(),
         domain,
+        subjectCode: subjectCode.trim() || 'CAPSTONE-01',
+        subjectName: subjectName.trim() || 'Major Capstone Project',
         techStack,
         assignedFacultyId: assignedFacultyId || null,
         initialStatus,
@@ -134,39 +173,39 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-sky-50 to-indigo-50/50">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-white">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
-              💡
+            <div className="w-8 h-8 rounded-md bg-slate-900 text-white flex items-center justify-center shadow-xs">
+              <FileText className="w-4 h-4 text-sky-400" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">New Capstone Project Proposal</h2>
-              <p className="text-xs text-slate-500">Formulate your capstone project scope, domain, and team</p>
+              <h2 className="text-sm font-bold text-slate-900">New Capstone Project Proposal</h2>
+              <p className="text-xs text-slate-500">Formulate your project scope, subject context, domain, and team</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-white/80 transition-colors"
+            className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
           >
             ✕
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-6 overflow-y-auto space-y-5 flex-1">
+        <div className="p-6 overflow-y-auto space-y-4 flex-1">
           {error && (
-            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-start space-x-2">
-              <span className="font-bold">⚠️</span>
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-md text-rose-800 text-xs flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
               <span>{error}</span>
             </div>
           )}
 
           {/* Project Title */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
               Project Title *
             </label>
             <input
@@ -174,41 +213,70 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Deep Learning Architecture for Diabetic Retinopathy"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all text-slate-900"
+              className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-md text-xs focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition text-slate-900"
             />
+          </div>
+
+          {/* Subject Context in 2 cols */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Subject / Course Code
+              </label>
+              <input
+                type="text"
+                value={subjectCode}
+                onChange={(e) => setSubjectCode(e.target.value)}
+                placeholder="e.g., CAPSTONE-01"
+                className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-md text-xs focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Subject / Course Name
+              </label>
+              <input
+                type="text"
+                value={subjectName}
+                onChange={(e) => setSubjectName(e.target.value)}
+                placeholder="e.g., Major Capstone Project"
+                className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-md text-xs focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition text-slate-900"
+              />
+            </div>
           </div>
 
           {/* Domain & Faculty Advisor in 2 cols */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Specialization Domain *
               </label>
               <select
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all text-slate-900"
+                className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-md text-xs focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition text-slate-900"
               >
-                {PRESET_DOMAINS.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
+                {domains.map((d) => (
+                  <option key={d.id} value={d.name}>
+                    {d.name}
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Faculty Supervisor / Guide *
               </label>
               <select
                 value={assignedFacultyId}
                 onChange={(e) => setAssignedFacultyId(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all text-slate-900"
+                className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-md text-xs focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition text-slate-900"
               >
-                {AVAILABLE_FACULTY.map((f) => (
+                <option value="">-- Let Department / Admin Assign Guide --</option>
+                {facultyList.map((f) => (
                   <option key={f.id} value={f.id}>
-                    {f.name} ({f.designation})
+                    {f.name} ({f.designation} • {f.departmentCode})
                   </option>
                 ))}
               </select>
@@ -217,26 +285,26 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({
 
           {/* Abstract */}
           <div>
-            <div className="flex justify-between items-center mb-1.5">
-              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-xs font-semibold text-slate-700">
                 Abstract & Problem Statement *
               </label>
-              <span className={`text-[11px] font-medium ${abstract.length < 20 ? 'text-amber-600' : 'text-slate-400'}`}>
+              <span className={`text-[11px] font-medium ${abstract.length < 20 ? 'text-amber-700' : 'text-slate-500'}`}>
                 {abstract.length} chars (min 20)
               </span>
             </div>
             <textarea
-              rows={4}
+              rows={3}
               value={abstract}
               onChange={(e) => setAbstract(e.target.value)}
               placeholder="Describe the research objective, clinical or industrial relevance, proposed machine learning methodology, and expected evaluation benchmarks..."
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all text-slate-900"
+              className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-md text-xs focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition text-slate-900"
             />
           </div>
 
           {/* Tech Stack Tags */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
               Technology Stack (Press Enter to add tag)
             </label>
             <div className="flex space-x-2 mb-2">
@@ -246,27 +314,27 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({
                 onChange={(e) => setTechInput(e.target.value)}
                 onKeyDown={handleAddTechTag}
                 placeholder="e.g., PyTorch, Transformers, FastAPI, Docker"
-                className="flex-1 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all text-slate-900"
+                className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-md text-xs focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition text-slate-900"
               />
               <button
                 type="button"
                 onClick={handleAddTechTag}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors"
+                className="px-3.5 py-1.5 border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-md transition"
               >
                 Add Tag
               </button>
             </div>
-            <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 bg-slate-50 border border-slate-100 rounded-xl">
+            <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 bg-slate-50 border border-slate-200 rounded-md">
               {techStack.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-sky-100/70 text-sky-800 border border-sky-200/50"
+                  className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-white text-slate-800 border border-slate-200"
                 >
                   {tag}
                   <button
                     type="button"
                     onClick={() => handleRemoveTechTag(tag)}
-                    className="ml-1.5 text-sky-600 hover:text-sky-900 font-bold"
+                    className="ml-1 text-slate-400 hover:text-slate-700 font-bold"
                   >
                     ×
                   </button>
@@ -277,13 +345,13 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({
 
           {/* Team Members Invite */}
           <div>
-            <div className="flex justify-between items-center mb-1.5">
-              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-xs font-semibold text-slate-700">
                 Invite Team Members
               </label>
               <span
-                className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                  isTeamFull ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
+                className={`text-[11px] font-semibold px-2 py-0.5 rounded border ${
+                  isTeamFull ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-slate-100 text-slate-700 border-slate-200'
                 }`}
               >
                 Team Size: {currentTeamSize} / {settings.maxTeamSize} (You + {selectedPeers.length})
@@ -292,38 +360,44 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({
             <p className="text-xs text-slate-500 mb-2">
               Select enrolled peers to join your proposal. You are assigned as Student Team Lead.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {PEER_STUDENTS.map((peer) => {
-                const isSelected = selectedPeers.some((p) => p.id === peer.id);
-                return (
-                  <button
-                    key={peer.id}
-                    type="button"
-                    onClick={() => handleTogglePeer(peer)}
-                    className={`p-2.5 rounded-xl border text-left transition-all flex flex-col ${
-                      isSelected
-                        ? 'bg-sky-50 border-sky-400 text-sky-950 shadow-sm'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="text-xs font-bold flex items-center justify-between">
-                      {peer.name}
-                      {isSelected && <span className="text-sky-600 text-xs">✓</span>}
-                    </span>
-                    <span className="text-[11px] text-slate-500 font-mono mt-0.5">{peer.rollNumber}</span>
-                  </button>
-                );
-              })}
-            </div>
+            {studentsList.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">No other enrolled students found in directory.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto p-1">
+                {studentsList.map((peer) => {
+                  const isSelected = selectedPeers.some((p) => p.id === peer.id);
+                  return (
+                    <button
+                      key={peer.id}
+                      type="button"
+                      onClick={() => handleTogglePeer(peer)}
+                      className={`p-2 rounded-md border text-left transition flex flex-col ${
+                        isSelected
+                          ? 'bg-sky-50 border-sky-300 text-sky-950'
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="text-xs font-semibold flex items-center justify-between">
+                        {peer.name}
+                        {isSelected && <span className="text-sky-700 text-xs font-bold">✓</span>}
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-mono mt-0.5">
+                        {peer.rollNumber || peer.email}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
+        <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 transition-colors"
+            className="px-3.5 py-1.5 border border-slate-300 rounded-md text-xs font-medium text-slate-700 hover:bg-white transition"
           >
             Cancel
           </button>
@@ -332,7 +406,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({
               type="button"
               disabled={isSubmitting}
               onClick={() => handleSubmit('DRAFT')}
-              className="px-4 py-2 border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl transition-all disabled:opacity-50"
+              className="px-3.5 py-1.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-md transition shadow-xs disabled:opacity-50"
             >
               Save as Draft
             </button>
@@ -340,7 +414,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({
               type="button"
               disabled={isSubmitting}
               onClick={() => handleSubmit('SUBMITTED')}
-              className="px-5 py-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm hover:shadow transition-all disabled:opacity-50 flex items-center space-x-1.5"
+              className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-md shadow-xs transition disabled:opacity-50 flex items-center space-x-1.5"
             >
               {isSubmitting ? (
                 <>

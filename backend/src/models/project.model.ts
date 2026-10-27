@@ -40,6 +40,8 @@ export interface IProject {
   title: string;
   abstract: string;
   domain: string;
+  subjectCode?: string;
+  subjectName?: string;
   facultyGuideId: string;
   status: 'ALLOCATED' | 'IN_PROGRESS' | 'UNDER_REVIEW' | 'CHANGES_REQUESTED' | 'EVALUATED' | 'COMPLETED' | 'SUSPENDED' | 'ARCHIVED';
   overallProgress: number;
@@ -123,6 +125,8 @@ const projectSchema = new Schema<IProject>(
     title: { type: String, required: true, trim: true },
     abstract: { type: String, required: true, trim: true },
     domain: { type: String, required: true, trim: true },
+    subjectCode: { type: String, trim: true, default: 'CAPSTONE-01', index: true },
+    subjectName: { type: String, trim: true, default: 'Major Capstone Project' },
     facultyGuideId: { type: String, ref: 'User', required: true, index: true },
     status: {
       type: String,

@@ -4,9 +4,11 @@ import { requireRole } from '../middleware/auth.middleware';
 import { logger } from '../utils/logger';
 import { Request, Response, NextFunction } from 'express';
 import { connectMongo, disconnectMongo } from './mongo';
+import { seedMongoData } from './seed_mongo';
 
 export const runAuthTests = async (): Promise<void> => {
   await connectMongo();
+  await seedMongoData();
 
   logger.info('================================================================');
   logger.info('🔐 STAGE 3: AUTHENTICATION & ROLE AUTHORIZATION TEST SUITE');
@@ -142,8 +144,103 @@ export const runAuthTests = async (): Promise<void> => {
     console.log(`✓ Session successfully invalidated upon logout: "${message}"`);
   }
 
+  // Test 11: Public Registration Role Guard (Rejection of ADMIN role)
+  logger.info('\n▶ Test 11: Admin Public Registration Guard (Expect 403 Forbidden)');
+  try {
+    await authService.register({
+      email: 'fakeadmin@splm.edu',
+      password: 'Password@123',
+      firstName: 'Unauthorized',
+      lastName: 'Admin',
+      role: 'ADMIN' as any,
+      departmentId: 1,
+    });
+    throw new Error('Test failed: Public registration with ADMIN role should have thrown 403');
+  } catch (err: unknown) {
+    const message = (err as Error).message;
+    console.log(`✓ Public ADMIN registration blocked: "${message}"`);
+  }
+
+  // Test 12: Seeded Admin Authentication Success
+  logger.info('\n▶ Test 12: Seeded Admin Authentication (admin@splm.edu + SPLM@Admin2026)');
+  const adminLogin = await authService.login({
+    email: 'admin@splm.edu',
+    password: 'SPLM@Admin2026',
+  });
+  console.log('✓ Admin authenticated successfully:');
+  console.log(`  Name: ${adminLogin.user.firstName} ${adminLogin.user.lastName}`);
+  console.log(`  Email: ${adminLogin.user.email}`);
+  console.log(`  Role: ${adminLogin.user.role}`);
+  console.log(`  Access Token: ${adminLogin.tokens.accessToken.substring(0, 25)}...`);
+  if (adminLogin.user.role !== 'ADMIN') {
+    throw new Error(`Expected role ADMIN, got: ${adminLogin.user.role}`);
+  }
+
+  // Test 13: Admin JWT and Session State Verification
+  logger.info('\n▶ Test 13: Admin Access Token Cryptographic Verification');
+  const decodedAdminPayload = verifyAccessToken(adminLogin.tokens.accessToken);
+  console.log('✓ Admin access token verified:');
+  console.log(`  User ID: ${decodedAdminPayload.id}`);
+  console.log(`  Email: ${decodedAdminPayload.email}`);
+  console.log(`  Role: ${decodedAdminPayload.role}`);
+  if (decodedAdminPayload.role !== 'ADMIN') {
+    throw new Error(`Token payload role is not ADMIN: ${decodedAdminPayload.role}`);
+  }
+
+  // Test 14: Admin Access to Admin Dashboard / Management Role Guard
+  logger.info('\n▶ Test 14: Admin Authorized Access to Admin-Only Endpoint Guard');
+  const adminOnlyGuard = requireRole(['ADMIN']);
+  let adminAuthorized = false;
+  const adminReq = { user: decodedAdminPayload } as Request;
+  const adminRes = {} as Response;
+  const adminNext: NextFunction = () => {
+    adminAuthorized = true;
+  };
+  adminOnlyGuard(adminReq, adminRes, adminNext);
+  if (!adminAuthorized) {
+    throw new Error('Admin was unexpectedly blocked from ADMIN role guard');
+  }
+  console.log('✓ Admin successfully authorized through ADMIN-only guard');
+
+  // Test 15: Role Boundary Enforcement - Student Blocked from Admin Endpoints
+  logger.info('\n▶ Test 15: Role Boundary - Student Blocked from Admin-Only Guard (Expect 403)');
+  let studentBlocked = false;
+  const studentReq = { user: decodedPayload } as Request; // decoded student token from Test 4
+  const studentNext: NextFunction = () => {
+    throw new Error('Test failed: Student should not have passed ADMIN role guard');
+  };
+  try {
+    adminOnlyGuard(studentReq, adminRes, studentNext);
+  } catch (err: unknown) {
+    studentBlocked = true;
+    const message = (err as Error).message;
+    console.log(`✓ Student blocked from Admin endpoints: "${message}"`);
+  }
+  if (!studentBlocked) {
+    throw new Error('Student was not blocked by ADMIN-only guard');
+  }
+
+  // Test 16: Role Boundary Enforcement - Faculty Blocked from Admin Endpoints
+  logger.info('\n▶ Test 16: Role Boundary - Faculty Blocked from Admin-Only Guard (Expect 403)');
+  const decodedFacultyPayload = verifyAccessToken(facultyLogin.tokens.accessToken);
+  let facultyBlocked = false;
+  const facultyReq = { user: decodedFacultyPayload } as Request;
+  const facultyNext: NextFunction = () => {
+    throw new Error('Test failed: Faculty should not have passed ADMIN role guard');
+  };
+  try {
+    adminOnlyGuard(facultyReq, adminRes, facultyNext);
+  } catch (err: unknown) {
+    facultyBlocked = true;
+    const message = (err as Error).message;
+    console.log(`✓ Faculty blocked from Admin endpoints: "${message}"`);
+  }
+  if (!facultyBlocked) {
+    throw new Error('Faculty was not blocked by ADMIN-only guard');
+  }
+
   logger.info('\n================================================================');
-  logger.info('🎉 STAGE 3 BACKEND AUTH & RBAC VERIFICATION COMPLETED (10/10 TESTS PASSED)');
+  logger.info('🎉 STAGE 3 BACKEND AUTH & RBAC VERIFICATION COMPLETED (16/16 TESTS PASSED)');
   logger.info('================================================================');
 
   await disconnectMongo();

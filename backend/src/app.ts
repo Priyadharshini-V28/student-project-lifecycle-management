@@ -12,6 +12,12 @@ import studentRoutes from './routes/student.routes';
 import facultyRoutes from './routes/faculty.routes';
 import proposalRoutes from './routes/proposal.routes';
 import projectRoutes from './routes/project.routes';
+import milestoneRoutes from './routes/milestone.routes';
+import allocationRoutes from './routes/allocation.routes';
+import metadataRoutes from './routes/metadata.routes';
+import documentRoutes from './routes/document.routes';
+import notificationRoutes from './routes/notification.routes';
+import evaluationRoutes from './routes/evaluation.routes';
 
 export const createApp = (): Application => {
   const app = express();
@@ -42,12 +48,18 @@ export const createApp = (): Application => {
 
   // Mount API routes
   app.use('/api', healthRoutes);
+  app.use('/api', metadataRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/students', studentRoutes);
   app.use('/api/faculty', facultyRoutes);
   app.use('/api/proposals', proposalRoutes);
   app.use('/api/projects', projectRoutes);
+  app.use('/api/projects', milestoneRoutes);
+  app.use('/api/projects', documentRoutes);
+  app.use('/api/projects', evaluationRoutes);
+  app.use('/api/allocations', allocationRoutes);
+  app.use('/api/notifications', notificationRoutes);
 
   // Fallback for unmatched routes
   app.use(notFoundHandler);

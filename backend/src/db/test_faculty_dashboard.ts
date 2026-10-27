@@ -2,11 +2,13 @@ import { facultyService } from '../services/faculty.service';
 import { requireRole } from '../middleware/auth.middleware';
 import { Project } from '../models';
 import { connectMongo, disconnectMongo } from './mongo';
+import { seedMongoData } from './seed_mongo';
 import { logger } from '../utils/logger';
 import { Request, Response, NextFunction } from 'express';
 
 export const runFacultyDashboardTests = async (): Promise<void> => {
   await connectMongo();
+  await seedMongoData();
 
   logger.info('================================================================');
   logger.info('📊 STAGE 6: FACULTY DASHBOARD AGGREGATION & ACTION QUEUES TEST SUITE');

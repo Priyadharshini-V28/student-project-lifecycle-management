@@ -12,6 +12,16 @@ export const createProposalSchema = z.object({
     .string()
     .min(2, 'Domain must be at least 2 characters')
     .max(100, 'Domain cannot exceed 100 characters'),
+  subjectCode: z
+    .string()
+    .min(1, 'Subject code cannot be empty')
+    .optional()
+    .default('CAPSTONE-01'),
+  subjectName: z
+    .string()
+    .min(1, 'Subject name cannot be empty')
+    .optional()
+    .default('Major Capstone Project'),
   techStack: z
     .array(z.string().min(1, 'Tech stack item cannot be empty'))
     .min(1, 'Please specify at least one technology stack tag')
@@ -45,6 +55,14 @@ export const updateProposalSchema = z.object({
     .string()
     .min(2, 'Domain must be at least 2 characters')
     .max(100, 'Domain cannot exceed 100 characters')
+    .optional(),
+  subjectCode: z
+    .string()
+    .min(1, 'Subject code cannot be empty')
+    .optional(),
+  subjectName: z
+    .string()
+    .min(1, 'Subject name cannot be empty')
     .optional(),
   techStack: z
     .array(z.string().min(1, 'Tech stack item cannot be empty'))
@@ -84,7 +102,7 @@ export const updateProjectRepoSchema = z.object({
     .max(255, 'Repository URL cannot exceed 255 characters'),
 });
 
-export type CreateProposalInput = z.infer<typeof createProposalSchema>;
+export type CreateProposalInput = z.input<typeof createProposalSchema>;
 export type UpdateProposalInput = z.infer<typeof updateProposalSchema>;
 export type ReviewProposalInput = z.infer<typeof reviewProposalSchema>;
 export type AddProposalMemberInput = z.infer<typeof addProposalMemberSchema>;

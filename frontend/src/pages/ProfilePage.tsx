@@ -3,6 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../services/api';
 import { ApiResponse, User, StudentAcademicProfile, FacultyAcademicProfile } from '../types';
+import {
+  ArrowLeft,
+  LogOut,
+  GraduationCap,
+  BookOpen,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  KeyRound,
+  Edit3,
+  Layers,
+  Building2,
+  User as UserIcon,
+} from 'lucide-react';
 
 export const ProfilePage: React.FC = () => {
   const { user, logout, updateUserState } = useAuth();
@@ -165,112 +179,123 @@ export const ProfilePage: React.FC = () => {
   };
 
   const getRoleBadgeClasses = () => {
-    if (user?.role === 'STUDENT') return 'bg-sky-50 text-sky-700 border-sky-200';
-    if (user?.role === 'FACULTY') return 'bg-indigo-50 text-indigo-700 border-indigo-200';
-    return 'bg-amber-50 text-amber-700 border-amber-200';
+    if (user?.role === 'STUDENT') return 'bg-sky-50 text-sky-800 border-sky-200';
+    if (user?.role === 'FACULTY') return 'bg-indigo-50 text-indigo-800 border-indigo-200';
+    return 'bg-purple-50 text-purple-800 border-purple-200';
+  };
+
+  const getRoleHeaderIcon = () => {
+    if (user?.role === 'STUDENT') return <GraduationCap className="w-5 h-5 text-sky-400" />;
+    if (user?.role === 'FACULTY') return <BookOpen className="w-5 h-5 text-indigo-400" />;
+    return <ShieldCheck className="w-5 h-5 text-purple-400" />;
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 pb-16">
+    <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-slate-900 pb-16">
       {/* Top Institutional Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-md bg-slate-900 flex items-center justify-center text-white shadow-xs">
+              {getRoleHeaderIcon()}
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h1 className="text-sm font-bold text-slate-900 leading-tight">Student Project Lifecycle Management</h1>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${getRoleBadgeClasses()}`}>
+                  {user?.role} PROFILE
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 font-medium">Department of Artificial Intelligence & Data Science</p>
+            </div>
+          </div>
+
           <div className="flex items-center space-x-3">
             <button
               onClick={() => navigate(getDashboardPath())}
-              className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-sky-600 transition"
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 border border-slate-300 rounded-md text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
               title="Return to Dashboard"
             >
-              <svg className="w-5 h-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Back to Dashboard
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to Dashboard</span>
             </button>
-            <span className="text-slate-300">|</span>
-            <span className="font-bold text-slate-800 text-base tracking-tight">
-              User Profile & Academic Credentials
-            </span>
-          </div>
 
-          <div className="flex items-center space-x-4">
-            <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${getRoleBadgeClasses()}`}>
-              {user?.role}
-            </span>
             <button
               onClick={logout}
-              className="text-xs font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-3 py-1.5 rounded-md border border-rose-200 transition"
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 border border-slate-300 rounded-md text-xs font-semibold text-slate-700 hover:text-rose-700 hover:bg-rose-50 transition"
             >
-              Sign Out
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
             </button>
           </div>
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-5">
         {/* Profile Banner Card */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex items-center space-x-5">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center text-white font-bold text-2xl shadow-md border-2 border-white">
+        <div className={`bg-white rounded-lg border border-slate-200 border-l-4 ${
+          user?.role === 'STUDENT' ? 'border-l-sky-600' : user?.role === 'FACULTY' ? 'border-l-indigo-600' : 'border-l-purple-600'
+        } p-5 shadow-xs`}>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="flex items-center space-x-4">
+              <div className="w-14 h-14 rounded-md bg-slate-900 flex items-center justify-center text-white font-bold text-lg shrink-0 shadow-xs">
                 {user?.firstName?.charAt(0) || 'U'}
                 {user?.lastName?.charAt(0) || ''}
               </div>
               <div>
-                <div className="flex items-center space-x-3">
-                  <h1 className="text-2xl font-bold text-slate-900">
+                <div className="flex items-center space-x-2.5">
+                  <h2 className="text-lg font-bold text-slate-900 leading-tight">
                     {user?.firstName} {user?.lastName}
-                  </h1>
-                  <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${getRoleBadgeClasses()}`}>
+                  </h2>
+                  <span className={`px-2 py-0.5 text-[11px] font-semibold rounded border ${getRoleBadgeClasses()}`}>
                     {user?.role}
                   </span>
                 </div>
-                <p className="text-sm text-slate-500 mt-0.5">{user?.email}</p>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">{user?.email}</p>
                 <div className="flex items-center space-x-2 mt-2">
-                  <span className="inline-flex items-center text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                    <svg className="w-3.5 h-3.5 mr-1 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                    {user?.departmentCode || 'AIDS'} — {user?.departmentName || 'Department of Artificial Intelligence & Data Science'}
+                  <span className="inline-flex items-center text-xs font-medium text-slate-700 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200">
+                    <Building2 className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
+                    {user?.departmentCode || 'AIDS'} &mdash; {user?.departmentName || 'Department of Artificial Intelligence & Data Science'}
                   </span>
                 </div>
               </div>
             </div>
 
             {/* Quick Stats Banner */}
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2.5">
               {user?.role === 'STUDENT' && (
                 <>
-                  <div className="bg-sky-50 border border-sky-100 rounded-lg px-4 py-2 text-center min-w-[100px]">
-                    <div className="text-xs font-semibold text-sky-600 uppercase">Roll No</div>
-                    <div className="text-sm font-bold text-sky-950 font-mono">{user.profile?.rollNumber || '22AD001'}</div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-md px-3.5 py-2 text-center min-w-[95px]">
+                    <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Roll No</div>
+                    <div className="text-xs font-bold text-slate-900 font-mono mt-0.5">{user.profile?.rollNumber || '22AD001'}</div>
                   </div>
-                  <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-2 text-center min-w-[100px]">
-                    <div className="text-xs font-semibold text-indigo-600 uppercase">Semester</div>
-                    <div className="text-base font-bold text-indigo-950">{user.profile?.semester || 6}th</div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-md px-3.5 py-2 text-center min-w-[95px]">
+                    <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Semester</div>
+                    <div className="text-xs font-bold text-slate-900 mt-0.5">{user.profile?.semester || 6}th</div>
                   </div>
-                  <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-4 py-2 text-center min-w-[100px]">
-                    <div className="text-xs font-semibold text-emerald-600 uppercase">CGPA</div>
-                    <div className="text-base font-bold text-emerald-950">{user.profile?.cgpa?.toFixed(2) || '8.85'}</div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-md px-3.5 py-2 text-center min-w-[95px]">
+                    <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">CGPA</div>
+                    <div className="text-xs font-bold text-emerald-700 mt-0.5">{user.profile?.cgpa?.toFixed(2) || '8.85'}</div>
                   </div>
                 </>
               )}
 
               {user?.role === 'FACULTY' && (
                 <>
-                  <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-2 text-center min-w-[100px]">
-                    <div className="text-xs font-semibold text-indigo-600 uppercase">Faculty ID</div>
-                    <div className="text-sm font-bold text-indigo-950 font-mono">{user.profile?.employeeId || 'FAC-AI-101'}</div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-md px-3.5 py-2 text-center min-w-[95px]">
+                    <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Faculty ID</div>
+                    <div className="text-xs font-bold text-slate-900 font-mono mt-0.5">{user.profile?.employeeId || 'FAC-AI-101'}</div>
                   </div>
-                  <div className="bg-sky-50 border border-sky-100 rounded-lg px-4 py-2 text-center min-w-[110px]">
-                    <div className="text-xs font-semibold text-sky-600 uppercase">Active Projects</div>
-                    <div className="text-base font-bold text-sky-950">
+                  <div className="bg-slate-50 border border-slate-200 rounded-md px-3.5 py-2 text-center min-w-[105px]">
+                    <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Active Projects</div>
+                    <div className="text-xs font-bold text-slate-900 mt-0.5">
                       {facultyData?.currentlyAssigned ?? 1} / {facultyData?.maxQuota ?? 5}
                     </div>
                   </div>
-                  <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-4 py-2 text-center min-w-[110px]">
-                    <div className="text-xs font-semibold text-emerald-600 uppercase">Remaining Quota</div>
-                    <div className="text-base font-bold text-emerald-950">
+                  <div className="bg-slate-50 border border-slate-200 rounded-md px-3.5 py-2 text-center min-w-[105px]">
+                    <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Remaining</div>
+                    <div className="text-xs font-bold text-emerald-700 mt-0.5">
                       {facultyData?.remainingCapacity ?? 4} Slots
                     </div>
                   </div>
@@ -278,128 +303,127 @@ export const ProfilePage: React.FC = () => {
               )}
 
               {user?.role === 'ADMIN' && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-center">
-                  <div className="text-xs font-semibold text-amber-700 uppercase">Access Level</div>
-                  <div className="text-sm font-bold text-amber-950">Department Head Administrator</div>
+                <div className="bg-slate-50 border border-slate-200 rounded-md px-3.5 py-2 text-center">
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Access Level</div>
+                  <div className="text-xs font-bold text-purple-900 mt-0.5">Department Head Administrator</div>
                 </div>
               )}
             </div>
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex border-b border-slate-200 mt-6 space-x-8">
+          <div className="flex border-b border-slate-200 mt-5 space-x-1">
             <button
               onClick={() => setActiveTab('overview')}
-              className={`pb-3 text-sm font-semibold border-b-2 transition ${
+              className={`pb-2.5 px-3.5 text-xs font-semibold transition flex items-center space-x-1.5 border-b-2 ${
                 activeTab === 'overview'
-                  ? 'border-sky-600 text-sky-600'
+                  ? 'border-slate-900 text-slate-900'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >
-              Academic Overview
+              <Layers className="w-3.5 h-3.5" />
+              <span>Academic Overview</span>
             </button>
             <button
               onClick={() => setActiveTab('edit')}
-              className={`pb-3 text-sm font-semibold border-b-2 transition ${
+              className={`pb-2.5 px-3.5 text-xs font-semibold transition flex items-center space-x-1.5 border-b-2 ${
                 activeTab === 'edit'
-                  ? 'border-sky-600 text-sky-600'
+                  ? 'border-slate-900 text-slate-900'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >
-              Edit Profile
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Edit Profile</span>
             </button>
             <button
               onClick={() => setActiveTab('security')}
-              className={`pb-3 text-sm font-semibold border-b-2 transition ${
+              className={`pb-2.5 px-3.5 text-xs font-semibold transition flex items-center space-x-1.5 border-b-2 ${
                 activeTab === 'security'
-                  ? 'border-sky-600 text-sky-600'
+                  ? 'border-slate-900 text-slate-900'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >
-              Security & Credentials
+              <KeyRound className="w-3.5 h-3.5" />
+              <span>Security & Credentials</span>
             </button>
           </div>
         </div>
 
         {/* Tab 1: Academic Overview */}
         {activeTab === 'overview' && (
-          <div className="space-y-6">
+          <div className="space-y-5">
             {/* Academic Information Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Institutional Credentials Card */}
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                <h2 className="text-base font-bold text-slate-900 mb-4 flex items-center">
-                  <svg className="w-5 h-5 mr-2 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  Institutional Credentials (Immutable)
-                </h2>
-                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-xs">
+                <h3 className="text-sm font-bold text-slate-900 mb-3.5 flex items-center">
+                  <UserIcon className="w-4 h-4 mr-2 text-slate-700" />
+                  <span>Institutional Credentials (Immutable)</span>
+                </h3>
+                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
                   <div>
-                    <dt className="text-xs font-semibold text-slate-400 uppercase">Full Name</dt>
-                    <dd className="font-semibold text-slate-800 mt-0.5">{user?.firstName} {user?.lastName}</dd>
+                    <dt className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Full Name</dt>
+                    <dd className="font-semibold text-slate-900 mt-0.5">{user?.firstName} {user?.lastName}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs font-semibold text-slate-400 uppercase">Institutional Email</dt>
-                    <dd className="font-semibold text-slate-800 mt-0.5">{user?.email}</dd>
+                    <dt className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Institutional Email</dt>
+                    <dd className="font-semibold text-slate-900 font-mono mt-0.5">{user?.email}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs font-semibold text-slate-400 uppercase">
+                    <dt className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                       {user?.role === 'STUDENT' ? 'University Roll Number' : 'Employee ID'}
                     </dt>
-                    <dd className="font-mono font-bold text-sky-700 mt-0.5">
+                    <dd className="font-mono font-bold text-slate-900 mt-0.5">
                       {user?.profile?.rollNumber || user?.profile?.employeeId || 'N/A'}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-xs font-semibold text-slate-400 uppercase">Department</dt>
-                    <dd className="font-semibold text-slate-800 mt-0.5">{user?.departmentCode} — AIDS</dd>
+                    <dt className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Department</dt>
+                    <dd className="font-semibold text-slate-900 mt-0.5">{user?.departmentCode} &mdash; AIDS</dd>
                   </div>
                 </dl>
               </div>
 
               {/* Role Specific Details Card */}
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                <h2 className="text-base font-bold text-slate-900 mb-4 flex items-center">
-                  <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                  Academic Standing & Domain Scope
-                </h2>
+              <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-xs">
+                <h3 className="text-sm font-bold text-slate-900 mb-3.5 flex items-center">
+                  <BookOpen className="w-4 h-4 mr-2 text-slate-700" />
+                  <span>Academic Standing & Domain Scope</span>
+                </h3>
                 {user?.role === 'STUDENT' && (
-                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
                     <div>
-                      <dt className="text-xs font-semibold text-slate-400 uppercase">Academic Batch</dt>
-                      <dd className="font-semibold text-slate-800 mt-0.5">{user.profile?.batchName || '2022-2026'}</dd>
+                      <dt className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Academic Batch</dt>
+                      <dd className="font-semibold text-slate-900 mt-0.5">{user.profile?.batchName || '2022-2026'}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs font-semibold text-slate-400 uppercase">Current Semester</dt>
-                      <dd className="font-semibold text-slate-800 mt-0.5">Semester {user.profile?.semester || 6}</dd>
+                      <dt className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Current Semester</dt>
+                      <dd className="font-semibold text-slate-900 mt-0.5">Semester {user.profile?.semester || 6}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs font-semibold text-slate-400 uppercase">Cumulative GPA</dt>
-                      <dd className="font-bold text-emerald-600 mt-0.5">{user.profile?.cgpa?.toFixed(2) || '8.85'} / 10.0</dd>
+                      <dt className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Cumulative GPA</dt>
+                      <dd className="font-bold text-emerald-700 mt-0.5">{user.profile?.cgpa?.toFixed(2) || '8.85'} / 10.0</dd>
                     </div>
                     <div>
-                      <dt className="text-xs font-semibold text-slate-400 uppercase">Degree Program</dt>
-                      <dd className="font-semibold text-slate-800 mt-0.5">B.Tech (AI & Data Science)</dd>
+                      <dt className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Degree Program</dt>
+                      <dd className="font-semibold text-slate-900 mt-0.5">B.Tech (AI & Data Science)</dd>
                     </div>
                   </dl>
                 )}
 
                 {user?.role === 'FACULTY' && (
-                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
                     <div>
-                      <dt className="text-xs font-semibold text-slate-400 uppercase">Official Designation</dt>
-                      <dd className="font-semibold text-slate-800 mt-0.5">{user.profile?.designation || 'Associate Professor'}</dd>
+                      <dt className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Official Designation</dt>
+                      <dd className="font-semibold text-slate-900 mt-0.5">{user.profile?.designation || 'Associate Professor'}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs font-semibold text-slate-400 uppercase">Supervising Quota</dt>
-                      <dd className="font-semibold text-slate-800 mt-0.5">{facultyData?.maxQuota || 5} Projects Max</dd>
+                      <dt className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Supervising Quota</dt>
+                      <dd className="font-semibold text-slate-900 mt-0.5">{facultyData?.maxQuota || 5} Projects Max</dd>
                     </div>
                     <div className="sm:col-span-2">
-                      <dt className="text-xs font-semibold text-slate-400 uppercase">Research Domains</dt>
-                      <dd className="font-semibold text-indigo-700 mt-0.5 bg-indigo-50/60 p-2 rounded border border-indigo-100">
+                      <dt className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Research Domains</dt>
+                      <dd className="font-medium text-slate-800 text-xs mt-1 bg-slate-50 p-2.5 rounded-md border border-slate-200">
                         {user.profile?.specialization || 'Computer Vision, Medical Image Analysis, Deep Learning'}
                       </dd>
                     </div>
@@ -407,7 +431,7 @@ export const ProfilePage: React.FC = () => {
                 )}
 
                 {user?.role === 'ADMIN' && (
-                  <p className="text-sm text-slate-600">
+                  <p className="text-xs text-slate-600 leading-relaxed">
                     Administrator accounts possess department-wide governance permissions, quota management, and review panel assignment controls.
                   </p>
                 )}
@@ -415,55 +439,53 @@ export const ProfilePage: React.FC = () => {
             </div>
 
             {/* Enrolled Projects / Supervised Projects Section */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <h2 className="text-base font-bold text-slate-900 mb-4 flex items-center justify-between">
+            <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-xs">
+              <h3 className="text-sm font-bold text-slate-900 mb-3.5 flex items-center justify-between">
                 <span className="flex items-center">
-                  <svg className="w-5 h-5 mr-2 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
-                  {user?.role === 'STUDENT' ? 'Active Capstone Project' : 'Supervised Projects'}
+                  <Layers className="w-4 h-4 mr-2 text-slate-700" />
+                  <span>{user?.role === 'STUDENT' ? 'Active Capstone Project' : 'Supervised Projects'}</span>
                 </span>
-                <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+                <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
                   {user?.role === 'STUDENT' ? (studentData?.projects?.length || 0) : (facultyData?.assignedProjects?.length || 0)} Total
                 </span>
-              </h2>
+              </h3>
 
               {isLoadingProfile ? (
-                <div className="py-8 flex justify-center items-center text-slate-400 text-sm">
-                  <div className="w-5 h-5 border-2 border-sky-600 border-t-transparent rounded-full animate-spin mr-2"></div>
-                  Loading project records...
+                <div className="py-6 flex justify-center items-center text-slate-500 text-xs">
+                  <div className="w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin mr-2"></div>
+                  <span>Loading project records...</span>
                 </div>
               ) : (
                 <>
                   {user?.role === 'STUDENT' && (
                     <div>
                       {studentData?.projects && studentData.projects.length > 0 ? (
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                           {studentData.projects.map((p) => (
-                            <div key={p.projectId} className="border border-slate-200 rounded-lg p-4 hover:border-sky-300 transition bg-slate-50/50">
+                            <div key={p.projectId} className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition bg-slate-50/50">
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                                <h3 className="font-bold text-slate-900 text-sm">{p.title}</h3>
+                                <h4 className="font-semibold text-slate-900 text-xs">{p.title}</h4>
                                 <div className="flex items-center space-x-2">
-                                  <span className="px-2 py-0.5 text-xs font-semibold rounded bg-sky-100 text-sky-800">
+                                  <span className="px-2 py-0.5 text-[11px] font-semibold rounded bg-sky-50 text-sky-800 border border-sky-200">
                                     {p.status}
                                   </span>
-                                  <span className="px-2 py-0.5 text-xs font-semibold rounded bg-amber-100 text-amber-800">
+                                  <span className="px-2 py-0.5 text-[11px] font-semibold rounded bg-slate-100 text-slate-700 border border-slate-200">
                                     Role: {p.roleInProject}
                                   </span>
                                 </div>
                               </div>
-                              <div className="text-xs text-slate-500 mb-3">
+                              <div className="text-xs text-slate-500 mb-2.5">
                                 <span className="font-medium text-slate-700">Domain:</span> {p.domain} &bull;{' '}
                                 <span className="font-medium text-slate-700">Faculty Guide:</span> {p.facultyGuide}
                               </div>
                               <div>
                                 <div className="flex justify-between text-xs text-slate-600 mb-1">
                                   <span>Overall Progress</span>
-                                  <span className="font-bold text-sky-700">{p.progress}%</span>
+                                  <span className="font-bold text-slate-900">{p.progress}%</span>
                                 </div>
-                                <div className="w-full bg-slate-200 rounded-full h-2">
+                                <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                                   <div
-                                    className="bg-sky-600 h-2 rounded-full transition-all duration-500"
+                                    className="bg-slate-900 h-1.5 rounded-full transition-all duration-500"
                                     style={{ width: `${p.progress}%` }}
                                   ></div>
                                 </div>
@@ -472,7 +494,7 @@ export const ProfilePage: React.FC = () => {
                           ))}
                         </div>
                       ) : (
-                        <p className="text-sm text-slate-500 py-4 text-center">No active project allocated yet.</p>
+                        <p className="text-xs text-slate-500 py-3 text-center">No active project allocated yet.</p>
                       )}
                     </div>
                   )}
@@ -480,27 +502,27 @@ export const ProfilePage: React.FC = () => {
                   {user?.role === 'FACULTY' && (
                     <div>
                       {facultyData?.assignedProjects && facultyData.assignedProjects.length > 0 ? (
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                           {facultyData.assignedProjects.map((p) => (
-                            <div key={p.projectId} className="border border-slate-200 rounded-lg p-4 hover:border-indigo-300 transition bg-slate-50/50">
+                            <div key={p.projectId} className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition bg-slate-50/50">
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                                <h3 className="font-bold text-slate-900 text-sm">{p.title}</h3>
-                                <span className="px-2 py-0.5 text-xs font-semibold rounded bg-indigo-100 text-indigo-800">
+                                <h4 className="font-semibold text-slate-900 text-xs">{p.title}</h4>
+                                <span className="px-2 py-0.5 text-[11px] font-semibold rounded bg-indigo-50 text-indigo-800 border border-indigo-200">
                                   {p.status}
                                 </span>
                               </div>
-                              <div className="text-xs text-slate-500 mb-3">
+                              <div className="text-xs text-slate-500 mb-2.5">
                                 <span className="font-medium text-slate-700">Domain:</span> {p.domain} &bull;{' '}
                                 <span className="font-medium text-slate-700">Student Lead:</span> {p.studentLead}
                               </div>
                               <div>
                                 <div className="flex justify-between text-xs text-slate-600 mb-1">
                                   <span>Milestone Progress</span>
-                                  <span className="font-bold text-indigo-700">{p.progress}%</span>
+                                  <span className="font-bold text-slate-900">{p.progress}%</span>
                                 </div>
-                                <div className="w-full bg-slate-200 rounded-full h-2">
+                                <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                                   <div
-                                    className="bg-indigo-600 h-2 rounded-full transition-all duration-500"
+                                    className="bg-slate-900 h-1.5 rounded-full transition-all duration-500"
                                     style={{ width: `${p.progress}%` }}
                                   ></div>
                                 </div>
@@ -509,13 +531,13 @@ export const ProfilePage: React.FC = () => {
                           ))}
                         </div>
                       ) : (
-                        <p className="text-sm text-slate-500 py-4 text-center">No projects currently under your guidance.</p>
+                        <p className="text-xs text-slate-500 py-3 text-center">No projects currently under your guidance.</p>
                       )}
                     </div>
                   )}
 
                   {user?.role === 'ADMIN' && (
-                    <div className="text-sm text-slate-600 py-2">
+                    <div className="text-xs text-slate-600 py-2">
                       Department Administrators oversee all projects in the AIDS department via the Admin Central Dashboard.
                     </div>
                   )}
@@ -527,31 +549,27 @@ export const ProfilePage: React.FC = () => {
 
         {/* Tab 2: Edit Profile */}
         {activeTab === 'edit' && (
-          <div className="max-w-2xl bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h2 className="text-base font-bold text-slate-900 mb-1">Edit Academic Profile</h2>
-            <p className="text-xs text-slate-500 mb-6">
+          <div className="max-w-2xl bg-white rounded-lg border border-slate-200 p-5 shadow-xs">
+            <h3 className="text-sm font-bold text-slate-900 mb-1">Edit Academic Profile</h3>
+            <p className="text-xs text-slate-500 mb-5">
               Update permitted profile attributes. Note that institutional identifiers (Roll Number, Employee ID, Email, Department) are immutable and managed centrally by Department Administration.
             </p>
 
             {profileSuccessMsg && (
-              <div className="mb-5 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center">
-                <svg className="w-4 h-4 mr-2 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                {profileSuccessMsg}
+              <div className="mb-4 p-3 rounded-md bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center">
+                <CheckCircle2 className="w-4 h-4 mr-2 text-emerald-600 shrink-0" />
+                <span>{profileSuccessMsg}</span>
               </div>
             )}
 
             {profileErrorMsg && (
-              <div className="mb-5 p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center">
-                <svg className="w-4 h-4 mr-2 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {profileErrorMsg}
+              <div className="mb-4 p-3 rounded-md bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center">
+                <AlertCircle className="w-4 h-4 mr-2 text-rose-600 shrink-0" />
+                <span>{profileErrorMsg}</span>
               </div>
             )}
 
-            <form onSubmit={handleUpdateProfile} className="space-y-5">
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">First Name *</label>
@@ -560,7 +578,7 @@ export const ProfilePage: React.FC = () => {
                     required
                     value={editFirstName}
                     onChange={(e) => setEditFirstName(e.target.value)}
-                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition"
+                    className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-300 focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition"
                   />
                 </div>
                 <div>
@@ -570,7 +588,7 @@ export const ProfilePage: React.FC = () => {
                     required
                     value={editLastName}
                     onChange={(e) => setEditLastName(e.target.value)}
-                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition"
+                    className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-300 focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition"
                   />
                 </div>
               </div>
@@ -583,7 +601,7 @@ export const ProfilePage: React.FC = () => {
                     <select
                       value={editSemester}
                       onChange={(e) => setEditSemester(Number(e.target.value))}
-                      className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition"
+                      className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-300 bg-white focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition"
                     >
                       {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
                         <option key={sem} value={sem}>
@@ -601,7 +619,7 @@ export const ProfilePage: React.FC = () => {
                       max="10"
                       value={editCgpa}
                       onChange={(e) => setEditCgpa(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                      className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition"
+                      className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-300 focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition"
                     />
                   </div>
                 </div>
@@ -609,7 +627,7 @@ export const ProfilePage: React.FC = () => {
 
               {/* Faculty Specific Inputs */}
               {user?.role === 'FACULTY' && (
-                <div className="space-y-4 pt-2 border-t border-slate-100">
+                <div className="space-y-3 pt-2 border-t border-slate-100">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Academic Designation</label>
                     <input
@@ -617,7 +635,7 @@ export const ProfilePage: React.FC = () => {
                       value={editDesignation}
                       onChange={(e) => setEditDesignation(e.target.value)}
                       placeholder="e.g. Associate Professor, Head of Research"
-                      className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                      className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-300 focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition"
                     />
                   </div>
                   <div>
@@ -627,17 +645,17 @@ export const ProfilePage: React.FC = () => {
                       value={editSpecialization}
                       onChange={(e) => setEditSpecialization(e.target.value)}
                       placeholder="e.g. Deep Learning, Computer Vision, Edge AI, Generative AI"
-                      className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                      className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-300 focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition"
                     />
                   </div>
                 </div>
               )}
 
-              <div className="pt-4 flex justify-end">
+              <div className="pt-2 flex justify-end">
                 <button
                   type="submit"
                   disabled={profileSaving}
-                  className="px-5 py-2 text-sm font-semibold rounded-lg bg-sky-600 hover:bg-sky-700 text-white shadow-sm disabled:opacity-50 transition"
+                  className="px-4 py-2 text-xs font-semibold rounded-md bg-slate-900 hover:bg-slate-800 text-white shadow-xs disabled:opacity-50 transition"
                 >
                   {profileSaving ? 'Saving Changes...' : 'Save Profile Changes'}
                 </button>
@@ -648,31 +666,27 @@ export const ProfilePage: React.FC = () => {
 
         {/* Tab 3: Security & Credentials */}
         {activeTab === 'security' && (
-          <div className="max-w-2xl bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h2 className="text-base font-bold text-slate-900 mb-1">Change Account Password</h2>
-            <p className="text-xs text-slate-500 mb-6">
+          <div className="max-w-2xl bg-white rounded-lg border border-slate-200 p-5 shadow-xs">
+            <h3 className="text-sm font-bold text-slate-900 mb-1">Change Account Password</h3>
+            <p className="text-xs text-slate-500 mb-5">
               Ensure your account uses a strong passphrase. All password updates are cryptographically hashed using bcrypt and recorded in the departmental security audit trail.
             </p>
 
             {passwordSuccessMsg && (
-              <div className="mb-5 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center">
-                <svg className="w-4 h-4 mr-2 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                {passwordSuccessMsg}
+              <div className="mb-4 p-3 rounded-md bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center">
+                <CheckCircle2 className="w-4 h-4 mr-2 text-emerald-600 shrink-0" />
+                <span>{passwordSuccessMsg}</span>
               </div>
             )}
 
             {passwordErrorMsg && (
-              <div className="mb-5 p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center">
-                <svg className="w-4 h-4 mr-2 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {passwordErrorMsg}
+              <div className="mb-4 p-3 rounded-md bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center">
+                <AlertCircle className="w-4 h-4 mr-2 text-rose-600 shrink-0" />
+                <span>{passwordErrorMsg}</span>
               </div>
             )}
 
-            <form onSubmit={handleChangePassword} className="space-y-5">
+            <form onSubmit={handleChangePassword} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Current Password *</label>
                 <input
@@ -681,7 +695,7 @@ export const ProfilePage: React.FC = () => {
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="Enter your current password"
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition"
+                  className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-300 focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition"
                 />
               </div>
 
@@ -693,7 +707,7 @@ export const ProfilePage: React.FC = () => {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter new strong password"
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition"
+                  className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-300 focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition"
                 />
               </div>
 
@@ -705,21 +719,24 @@ export const ProfilePage: React.FC = () => {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Re-type new password"
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition"
+                  className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-300 focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition"
                 />
               </div>
 
               {/* Password Requirements Checklist */}
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs space-y-1">
-                <span className="font-semibold text-slate-600 block mb-1">Password Requirements:</span>
-                <div className={`flex items-center ${newPassword.length >= 8 ? 'text-emerald-700 font-medium' : 'text-slate-500'}`}>
-                  <span className="mr-1.5">{newPassword.length >= 8 ? '✓' : '•'}</span> At least 8 characters
+              <div className="bg-slate-50 p-3 rounded-md border border-slate-200 text-xs space-y-1">
+                <span className="font-semibold text-slate-700 block mb-1">Password Requirements:</span>
+                <div className={`flex items-center space-x-1.5 ${newPassword.length >= 8 ? 'text-emerald-700 font-medium' : 'text-slate-500'}`}>
+                  <span>{newPassword.length >= 8 ? '✓' : '•'}</span>
+                  <span>At least 8 characters</span>
                 </div>
-                <div className={`flex items-center ${/[A-Z]/.test(newPassword) ? 'text-emerald-700 font-medium' : 'text-slate-500'}`}>
-                  <span className="mr-1.5">{/[A-Z]/.test(newPassword) ? '✓' : '•'}</span> At least one uppercase letter (A-Z)
+                <div className={`flex items-center space-x-1.5 ${/[A-Z]/.test(newPassword) ? 'text-emerald-700 font-medium' : 'text-slate-500'}`}>
+                  <span>{/[A-Z]/.test(newPassword) ? '✓' : '•'}</span>
+                  <span>At least one uppercase letter (A-Z)</span>
                 </div>
-                <div className={`flex items-center ${/[0-9]/.test(newPassword) ? 'text-emerald-700 font-medium' : 'text-slate-500'}`}>
-                  <span className="mr-1.5">{/[0-9]/.test(newPassword) ? '✓' : '•'}</span> At least one numeric digit (0-9)
+                <div className={`flex items-center space-x-1.5 ${/[0-9]/.test(newPassword) ? 'text-emerald-700 font-medium' : 'text-slate-500'}`}>
+                  <span>{/[0-9]/.test(newPassword) ? '✓' : '•'}</span>
+                  <span>At least one numeric digit (0-9)</span>
                 </div>
               </div>
 
@@ -729,15 +746,15 @@ export const ProfilePage: React.FC = () => {
                     type="checkbox"
                     checked={showPasswords}
                     onChange={(e) => setShowPasswords(e.target.checked)}
-                    className="rounded border-slate-300 text-sky-600 mr-2 focus:ring-sky-500"
+                    className="rounded border-slate-300 text-slate-900 mr-2 focus:ring-slate-900"
                   />
-                  Show Passwords
+                  <span>Show Passwords</span>
                 </label>
 
                 <button
                   type="submit"
                   disabled={passwordSaving}
-                  className="px-5 py-2 text-sm font-semibold rounded-lg bg-sky-600 hover:bg-sky-700 text-white shadow-sm disabled:opacity-50 transition"
+                  className="px-4 py-2 text-xs font-semibold rounded-md bg-slate-900 hover:bg-slate-800 text-white shadow-xs disabled:opacity-50 transition"
                 >
                   {passwordSaving ? 'Updating...' : 'Update Password'}
                 </button>

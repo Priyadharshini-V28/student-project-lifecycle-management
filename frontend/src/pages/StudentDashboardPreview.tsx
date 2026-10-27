@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { 
   GraduationCap, 
   LogOut, 
-  CheckCircle2, 
+  CheckCircle2,
   User 
 } from 'lucide-react';
 
@@ -66,10 +66,6 @@ export const StudentDashboardPreview: React.FC = () => {
         {/* Welcome Card */}
         <div className="bg-gradient-to-r from-sky-900 via-sky-800 to-indigo-900 rounded-2xl p-6 sm:p-8 text-white shadow-lg">
           <div className="max-w-2xl space-y-2">
-            <div className="inline-flex items-center space-x-2 px-3 py-1 bg-emerald-500/20 rounded-full border border-emerald-400/30 text-emerald-200 text-xs font-semibold">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Authenticated Session Active (JWT + Redis Protected)</span>
-            </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
               Welcome back, {user?.firstName}!
             </h2>

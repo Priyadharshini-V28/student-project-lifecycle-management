@@ -1,10 +1,12 @@
 import { proposalService } from '../services/proposal.service';
 import { User, Project } from '../models';
 import { connectMongo, disconnectMongo } from './mongo';
+import { seedMongoData } from './seed_mongo';
 import { logger } from '../utils/logger';
 
 export const runProposalTests = async (): Promise<void> => {
   await connectMongo();
+  await seedMongoData();
 
   logger.info('================================================================');
   logger.info('📑 STAGE 7: PROPOSAL & PROJECT LIFECYCLE MANAGEMENT TEST SUITE');

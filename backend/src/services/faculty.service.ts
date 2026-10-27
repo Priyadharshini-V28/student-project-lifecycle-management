@@ -1,4 +1,4 @@
-import { User, Project, Review, Proposal, Department } from '../models';
+import { User, Project, Review, Proposal, Department, AuditLog } from '../models';
 import { ApiError } from '../utils/ApiError';
 import { logger } from '../utils/logger';
 
@@ -330,6 +330,81 @@ export class FacultyService {
         pendingProposals,
       },
       assignedProjects,
+    };
+  }
+
+  /**
+   * Fetch all active faculty members for guide allocation and proposal selection
+   */
+  async getFacultyDirectory(departmentId?: number): Promise<unknown[]> {
+    const query: Record<string, unknown> = { role: 'FACULTY', isActive: { $ne: false } };
+    if (departmentId) query.departmentId = departmentId;
+
+    const facultyDocs = await User.find(query).sort({ lastName: 1, firstName: 1 });
+    const depts = await Department.find();
+    const deptMap = new Map(depts.map((d) => [d._id, d.code]));
+
+    return Promise.all(
+      facultyDocs.map(async (f) => {
+        const maxQuota = f.facultyProfile?.maxProjects ?? 5;
+        const currentlyAssigned = await Project.countDocuments({
+          facultyGuideId: f.id,
+          status: { $nin: ['COMPLETED', 'ARCHIVED'] },
+        });
+
+        return {
+          id: f.id,
+          name: `${f.firstName} ${f.lastName}`,
+          email: f.email,
+          employeeId: f.facultyProfile?.employeeId || '',
+          designation: f.facultyProfile?.designation || 'Faculty Member',
+          specialization: f.facultyProfile?.specialization || '',
+          departmentId: f.departmentId,
+          departmentCode: f.departmentId ? deptMap.get(f.departmentId) || 'AIDS' : 'AIDS',
+          maxProjects: maxQuota,
+          currentlyAssigned,
+          remainingCapacity: Math.max(0, maxQuota - currentlyAssigned),
+          isAvailable: currentlyAssigned < maxQuota,
+        };
+      })
+    );
+  }
+
+  /**
+   * Update faculty member research specialization (Admin privilege)
+   */
+  async updateFacultySpecialization(
+    facultyId: string,
+    specialization: string,
+    adminUserId?: string
+  ): Promise<unknown> {
+    const actorId = adminUserId || 'a0000000-0000-0000-0000-000000000001';
+    const faculty = await User.findById(facultyId);
+    if (!faculty || (faculty.role !== 'FACULTY' && faculty.role !== 'ADMIN')) {
+      throw ApiError.notFound('Faculty member not found.');
+    }
+
+    if (!faculty.facultyProfile) {
+      faculty.facultyProfile = {};
+    }
+
+    const previousSpec = faculty.facultyProfile.specialization || '';
+    faculty.facultyProfile.specialization = specialization.trim();
+    await faculty.save();
+
+    await AuditLog.create({
+      userId: actorId,
+      action: 'FACULTY_SPECIALIZATION_UPDATED',
+      entityType: 'USER',
+      entityId: facultyId,
+      details: { previousSpecialization: previousSpec, newSpecialization: faculty.facultyProfile.specialization },
+    });
+
+    logger.info(`[FacultyService] Specialization for faculty ${facultyId} updated by admin ${actorId}`);
+    return {
+      id: faculty.id,
+      name: `${faculty.firstName} ${faculty.lastName}`,
+      specialization: faculty.facultyProfile.specialization,
     };
   }
 }

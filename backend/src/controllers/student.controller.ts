@@ -24,3 +24,21 @@ export const getDashboard = async (req: Request, res: Response, next: NextFuncti
     next(err);
   }
 };
+
+export const getStudentList = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const departmentId = req.query.departmentId ? Number(req.query.departmentId) : undefined;
+    const callerId = req.user?.id;
+    const students = await studentService.getStudentDirectory(callerId, departmentId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Student directory retrieved successfully',
+      data: students,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+

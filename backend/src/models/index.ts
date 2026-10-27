@@ -8,3 +8,5 @@ export * from './review.model';
 export * from './document.model';
 export * from './notification.model';
 export * from './auditLog.model';
+export * from './domain.model';
+export * from './evaluation.model';

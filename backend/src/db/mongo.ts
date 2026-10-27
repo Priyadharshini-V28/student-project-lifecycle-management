@@ -7,6 +7,7 @@ import { User } from '../models';
 
 let memReplSet: MongoMemoryReplSet | null = null;
 let isConnected = false;
+let supportsTransactions = false;
 
 /**
  * Connect to external MongoDB or fallback to MongoMemoryReplSet
@@ -25,6 +26,15 @@ export const connectMongo = async (): Promise<typeof mongoose> => {
     isConnected = true;
     logger.info('Connected to live external MongoDB database.');
 
+    // Check if external deployment supports transactions (Replica Set or mongos)
+    try {
+      const helloResult = await mongoose.connection.db?.admin().command({ hello: 1 });
+      supportsTransactions = Boolean(helloResult?.setName || helloResult?.msg === 'isdbgrid');
+      logger.info(`External MongoDB transaction support: ${supportsTransactions ? 'ENABLED (ReplSet)' : 'STANDALONE (Running in direct mode)'}`);
+    } catch {
+      supportsTransactions = false;
+    }
+
     // Auto-seed if database is empty
     const userCount = await User.countDocuments();
     if (userCount === 0) {
@@ -33,8 +43,8 @@ export const connectMongo = async (): Promise<typeof mongoose> => {
     }
 
     return mongoose;
-  } catch {
-    logger.warn('⚠️ External MongoDB not reachable. Initializing In-Memory MongoDB Engine (ReplSet with Transaction Support)...');
+  } catch (err: any) {
+    logger.warn(`⚠️ External MongoDB not reachable (${err?.message || err}). Initializing In-Memory MongoDB Engine (ReplSet with Transaction Support)...`);
   }
 
   // 2. Fallback to In-Memory MongoDB ReplSet
@@ -47,6 +57,7 @@ export const connectMongo = async (): Promise<typeof mongoose> => {
   const memUri = memReplSet.getUri();
   await mongoose.connect(memUri);
   isConnected = true;
+  supportsTransactions = true;
   logger.info(`✅ In-Memory MongoDB initialized successfully at ${memUri}`);
 
   // Seed academic data
@@ -67,6 +78,7 @@ export const disconnectMongo = async (): Promise<void> => {
     memReplSet = null;
   }
   isConnected = false;
+  supportsTransactions = false;
   logger.info('MongoDB disconnected.');
 };
 
@@ -77,6 +89,11 @@ export const withMongoTransaction = async <T>(
   callback: (session: mongoose.ClientSession) => Promise<T>
 ): Promise<T> => {
   await connectMongo();
+
+  if (!supportsTransactions) {
+    // Execute directly without transaction session on standalone MongoDB deployments
+    return await callback(undefined as any);
+  }
 
   const session = await mongoose.startSession();
   try {

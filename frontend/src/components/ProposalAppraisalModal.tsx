@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { proposalsApi } from '../services/api';
 import { ProposalDetailDto } from '../types';
+import { ClipboardCheck, AlertCircle } from 'lucide-react';
 
 interface ProposalAppraisalModalProps {
   proposalId: string | null;
@@ -67,39 +68,39 @@ export const ProposalAppraisalModal: React.FC<ProposalAppraisalModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-indigo-50 to-purple-50/50">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-white">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
-              ⚖️
+            <div className="w-8 h-8 rounded-md bg-slate-900 text-white flex items-center justify-center shadow-xs">
+              <ClipboardCheck className="w-4 h-4 text-indigo-400" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Proposal Appraisal & Allocation</h2>
+              <h2 className="text-sm font-bold text-slate-900">Proposal Appraisal & Allocation</h2>
               <p className="text-xs text-slate-500">Evaluate capstone project proposal for official institution sign-off</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-white/80 transition-colors"
+            className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
           >
             ✕
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto space-y-5 flex-1">
+        <div className="p-6 overflow-y-auto space-y-4 flex-1">
           {isLoading ? (
             <div className="py-12 flex flex-col items-center justify-center space-y-3">
-              <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+              <div className="w-6 h-6 border-2 border-slate-900 border-t-transparent rounded-full animate-spin"></div>
               <p className="text-xs text-slate-500">Loading proposal details...</p>
             </div>
           ) : proposal ? (
             <>
               {error && (
-                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-start space-x-2">
-                  <span className="font-bold">⚠️</span>
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-md text-rose-800 text-xs flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
                   <span>{error}</span>
                 </div>
               )}
@@ -107,51 +108,51 @@ export const ProposalAppraisalModal: React.FC<ProposalAppraisalModalProps> = ({
               {/* Title & Badges */}
               <div>
                 <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
+                  <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200">
                     {proposal.domain}
                   </span>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                  <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
                     v{proposal.version} ({proposal.academicYear})
                   </span>
                   <span
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                    className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${
                       proposal.status === 'APPROVED'
-                        ? 'bg-emerald-100 text-emerald-800'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                         : proposal.status === 'CHANGES_REQUESTED'
-                        ? 'bg-amber-100 text-amber-800'
+                        ? 'bg-amber-50 text-amber-800 border-amber-200'
                         : proposal.status === 'REJECTED'
-                        ? 'bg-rose-100 text-rose-800'
-                        : 'bg-sky-100 text-sky-800'
+                        ? 'bg-rose-50 text-rose-800 border-rose-200'
+                        : 'bg-sky-50 text-sky-800 border-sky-200'
                     }`}
                   >
                     {proposal.status.replace(/_/g, ' ')}
                   </span>
                 </div>
-                <h3 className="text-base font-bold text-slate-900">{proposal.title}</h3>
+                <h3 className="text-sm font-bold text-slate-900">{proposal.title}</h3>
               </div>
 
               {/* Student Lead & Team Roster */}
-              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl">
-                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-md">
+                <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
                   Team Roster ({proposal.members.length} student{proposal.members.length > 1 ? 's' : ''})
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {proposal.members.map((m) => (
                     <div
                       key={m.id}
-                      className="p-2 bg-white border border-slate-200 rounded-lg flex items-center justify-between text-xs"
+                      className="p-2 bg-white border border-slate-200 rounded-md flex items-center justify-between text-xs"
                     >
                       <div>
-                        <span className="font-bold text-slate-800">{m.name}</span>
-                        <span className="text-slate-500 ml-1.5 font-mono">({m.rollNumber})</span>
+                        <span className="font-semibold text-slate-800">{m.name}</span>
+                        <span className="text-slate-500 ml-1.5 font-mono text-[11px]">({m.rollNumber})</span>
                       </div>
                       <span
-                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
                           m.isLead
-                            ? 'bg-amber-100 text-amber-800'
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
                             : m.status === 'ACCEPTED'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-slate-100 text-slate-600'
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : 'bg-slate-100 text-slate-600 border border-slate-200'
                         }`}
                       >
                         {m.isLead ? 'LEAD' : m.status}
@@ -163,24 +164,24 @@ export const ProposalAppraisalModal: React.FC<ProposalAppraisalModalProps> = ({
 
               {/* Abstract */}
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
                   Abstract & Research Scope
                 </label>
-                <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 leading-relaxed max-h-36 overflow-y-auto">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-md text-xs text-slate-700 leading-relaxed max-h-32 overflow-y-auto">
                   {proposal.abstract}
                 </div>
               </div>
 
               {/* Tech Stack */}
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
                   Proposed Technology Stack
                 </label>
                 <div className="flex flex-wrap gap-1.5">
                   {proposal.techStack.map((tech) => (
                     <span
                       key={tech}
-                      className="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200"
+                      className="px-2 py-0.5 rounded text-[11px] font-medium bg-white text-slate-700 border border-slate-200"
                     >
                       {tech}
                     </span>
@@ -192,17 +193,17 @@ export const ProposalAppraisalModal: React.FC<ProposalAppraisalModalProps> = ({
 
               {/* Appraisal Decision Radio Selector */}
               <div>
-                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Evaluation Decision *
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setDecision('APPROVED')}
-                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all text-center ${
+                    className={`py-2 px-3 rounded-md border text-xs font-semibold transition text-center ${
                       decision === 'APPROVED'
-                        ? 'bg-emerald-50 border-emerald-500 text-emerald-800 shadow-sm'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                        ? 'bg-emerald-50 border-emerald-400 text-emerald-900 shadow-xs'
+                        : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
                     }`}
                   >
                     ✓ Approve
@@ -210,10 +211,10 @@ export const ProposalAppraisalModal: React.FC<ProposalAppraisalModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setDecision('CHANGES_REQUESTED')}
-                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all text-center ${
+                    className={`py-2 px-3 rounded-md border text-xs font-semibold transition text-center ${
                       decision === 'CHANGES_REQUESTED'
-                        ? 'bg-amber-50 border-amber-500 text-amber-800 shadow-sm'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                        ? 'bg-amber-50 border-amber-400 text-amber-900 shadow-xs'
+                        : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
                     }`}
                   >
                     ✎ Request Changes
@@ -221,10 +222,10 @@ export const ProposalAppraisalModal: React.FC<ProposalAppraisalModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setDecision('REJECTED')}
-                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all text-center ${
+                    className={`py-2 px-3 rounded-md border text-xs font-semibold transition text-center ${
                       decision === 'REJECTED'
-                        ? 'bg-rose-50 border-rose-500 text-rose-800 shadow-sm'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                        ? 'bg-rose-50 border-rose-400 text-rose-900 shadow-xs'
+                        : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
                     }`}
                   >
                     ✕ Reject
@@ -232,19 +233,19 @@ export const ProposalAppraisalModal: React.FC<ProposalAppraisalModalProps> = ({
                 </div>
 
                 {/* Contextual Notice */}
-                <div className="mt-3 text-xs">
+                <div className="mt-2.5 text-xs">
                   {decision === 'APPROVED' && (
-                    <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-emerald-800 leading-relaxed">
-                      <strong>Auto-Instantiation Notice:</strong> Approving this proposal will atomically create an official project in the <code className="bg-emerald-100 px-1 rounded">projects</code> table with status <code className="bg-emerald-100 px-1 rounded">ALLOCATED</code>, allocate the confirmed team roster, and pre-populate the 5 standard academic milestone gates.
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-md text-emerald-900 leading-relaxed">
+                      <strong>Auto-Instantiation Notice:</strong> Approving this proposal will atomically create an official project in the projects catalog with status <code>ALLOCATED</code>, allocate the confirmed team roster, and pre-populate the 5 standard academic milestone gates.
                     </div>
                   )}
                   {decision === 'CHANGES_REQUESTED' && (
-                    <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-amber-800 leading-relaxed">
-                      <strong>Revision Cycle:</strong> The proposal status will transition to <code className="bg-amber-100 px-1 rounded">CHANGES_REQUESTED</code>. The student lead will be permitted to edit the abstract, scope, or tech stack and resubmit as version {proposal.version + 1}.
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-900 leading-relaxed">
+                      <strong>Revision Cycle:</strong> The proposal status will transition to <code>CHANGES_REQUESTED</code>. The student lead will be permitted to edit the abstract, scope, or tech stack and resubmit as version {proposal.version + 1}.
                     </div>
                   )}
                   {decision === 'REJECTED' && (
-                    <div className="p-3 bg-rose-50/70 border border-rose-200 rounded-xl text-rose-800 leading-relaxed">
+                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-md text-rose-900 leading-relaxed">
                       <strong>Terminal State:</strong> The proposal will be marked as rejected. Clear academic justification is mandatory for institutional records.
                     </div>
                   )}
@@ -253,7 +254,7 @@ export const ProposalAppraisalModal: React.FC<ProposalAppraisalModalProps> = ({
 
               {/* Faculty Remarks Textarea */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Supervisor Remarks & Evaluation Feedback *
                 </label>
                 <textarea
@@ -265,7 +266,7 @@ export const ProposalAppraisalModal: React.FC<ProposalAppraisalModalProps> = ({
                       ? 'e.g., Well-formulated research design and robust methodology. Approved for capstone execution.'
                       : 'e.g., Narrow down the clinical dataset, specify baseline comparison models, and detail GPU hardware feasibility...'
                   }
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-slate-900"
+                  className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-md text-xs focus:outline-hidden focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition text-slate-900"
                 />
               </div>
             </>
@@ -273,11 +274,11 @@ export const ProposalAppraisalModal: React.FC<ProposalAppraisalModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
+        <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 transition-colors"
+            className="px-3.5 py-1.5 border border-slate-300 rounded-md text-xs font-medium text-slate-700 hover:bg-white transition"
           >
             Cancel
           </button>
@@ -285,12 +286,12 @@ export const ProposalAppraisalModal: React.FC<ProposalAppraisalModalProps> = ({
             type="button"
             disabled={isSubmitting || isLoading || !proposal}
             onClick={handleSubmitReview}
-            className={`px-5 py-2 text-white text-xs font-semibold rounded-xl shadow-sm hover:shadow transition-all disabled:opacity-50 flex items-center space-x-1.5 ${
+            className={`px-4 py-1.5 text-white text-xs font-semibold rounded-md shadow-xs transition disabled:opacity-50 flex items-center space-x-1.5 ${
               decision === 'APPROVED'
-                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
+                ? 'bg-slate-900 hover:bg-slate-800'
                 : decision === 'CHANGES_REQUESTED'
-                ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700'
-                : 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700'
+                ? 'bg-amber-700 hover:bg-amber-800'
+                : 'bg-rose-700 hover:bg-rose-800'
             }`}
           >
             {isSubmitting ? (

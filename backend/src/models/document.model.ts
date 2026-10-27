@@ -7,10 +7,13 @@ export interface IDocument {
   uploadedBy: string;
   documentType: 'PROPOSAL' | 'SRS' | 'ARCHITECTURE_DESIGN' | 'MID_TERM_REPORT' | 'FINAL_THESIS' | 'PRESENTATION' | 'SOURCE_CODE_ZIP';
   fileName: string;
+  originalFileName?: string;
   filePath: string;
   fileSizeBytes: number;
   mimeType: string;
   version: number;
+  remarks?: string;
+  milestoneId?: string;
   uploadedAt?: Date;
 }
 
@@ -25,10 +28,13 @@ const documentSchema = new Schema<IDocument>(
       enum: ['PROPOSAL', 'SRS', 'ARCHITECTURE_DESIGN', 'MID_TERM_REPORT', 'FINAL_THESIS', 'PRESENTATION', 'SOURCE_CODE_ZIP'],
     },
     fileName: { type: String, required: true },
+    originalFileName: { type: String },
     filePath: { type: String, required: true },
     fileSizeBytes: { type: Number, required: true },
     mimeType: { type: String, required: true },
     version: { type: Number, default: 1 },
+    remarks: { type: String },
+    milestoneId: { type: String },
     uploadedAt: { type: Date, default: Date.now },
   },
   {
@@ -43,4 +49,8 @@ const documentSchema = new Schema<IDocument>(
   }
 );
 
+documentSchema.index({ projectId: 1, documentType: 1, version: -1 });
+
 export const DocumentModel = model<IDocument>('Document', documentSchema);
+export const Document = DocumentModel;
+

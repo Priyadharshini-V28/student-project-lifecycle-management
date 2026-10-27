@@ -82,6 +82,8 @@ export interface ActiveProjectDto {
   title: string;
   abstract: string;
   domain: string;
+  subjectCode?: string;
+  subjectName?: string;
   status: string;
   overallProgress: number;
   repositoryUrl: string | null;
@@ -162,6 +164,16 @@ export interface StudentDashboardData {
   };
   metrics: StudentDashboardMetrics;
   activeProject: ActiveProjectDto | null;
+  allProjects?: Array<{
+    id: string;
+    title: string;
+    domain: string;
+    status: string;
+    subjectCode: string;
+    subjectName: string;
+    overallProgress: number;
+    roleInProject: string;
+  }>;
   milestones: MilestoneDto[];
   latestReview: LatestReviewDto | null;
   proposals: ProposalDto[];
@@ -320,6 +332,8 @@ export interface CreateProposalInput {
   title: string;
   abstract: string;
   domain: string;
+  subjectCode?: string;
+  subjectName?: string;
   techStack: string[];
   assignedFacultyId?: string | null;
   initialStatus?: 'DRAFT' | 'SUBMITTED';
@@ -330,6 +344,8 @@ export interface UpdateProposalInput {
   title?: string;
   abstract?: string;
   domain?: string;
+  subjectCode?: string;
+  subjectName?: string;
   techStack?: string[];
   assignedFacultyId?: string | null;
 }
@@ -339,5 +355,250 @@ export interface ReviewProposalInput {
   facultyComments: string;
 }
 
+// Stage 8: Faculty Guide Allocation Interfaces
+export interface ActiveProjectSummary {
+  id: string;
+  title: string;
+  domain: string;
+  status: string;
+  overallProgress: number;
+  leadStudentName?: string;
+}
+
+export interface FacultyCapacityItem {
+  id: string;
+  name: string;
+  email: string;
+  employeeId: string;
+  designation: string;
+  specialization: string;
+  departmentId?: number;
+  departmentCode?: string;
+  maxProjects: number;
+  currentlyAssigned: number;
+  remainingCapacity: number;
+  utilizationRate: number;
+  status: 'AVAILABLE' | 'NEAR_CAPACITY' | 'FULL';
+  activeProjects: ActiveProjectSummary[];
+  pendingProposalsCount: number;
+}
+
+export interface AllocationMatrixDto {
+  summary: {
+    totalFaculty: number;
+    totalCapacity: number;
+    totalAssigned: number;
+    availableSlots: number;
+    overallUtilization: number;
+  };
+  faculty: FacultyCapacityItem[];
+}
+
+export interface PendingProposalSummary {
+  id: string;
+  title: string;
+  domain: string;
+  status: string;
+  leadStudent: string;
+  assignedFaculty: { id: string; name: string } | null;
+  createdAt: string;
+}
+
+export interface ActiveProjectAllocationSummary {
+  id: string;
+  title: string;
+  domain: string;
+  status: string;
+  overallProgress: number;
+  currentGuide: { id: string; name: string } | null;
+  leadStudent: string;
+}
+
+export interface UnallocatedItemsDto {
+  pendingProposals: PendingProposalSummary[];
+  activeProjects: ActiveProjectAllocationSummary[];
+}
+
+export interface GuideRecommendationDto {
+  facultyId: string;
+  name: string;
+  designation: string;
+  specialization: string;
+  departmentCode: string;
+  maxProjects: number;
+  currentlyAssigned: number;
+  remainingCapacity: number;
+  matchScore: number;
+  matchedKeywords: string[];
+  recommendationReason: string;
+}
+
+export interface ReassignProjectGuideInput {
+  newFacultyGuideId: string;
+  reason: string;
+}
+
+export interface AssignProposalGuideInput {
+  facultyId: string;
+  allocateProject?: boolean;
+}
+
+export interface UpdateFacultyCapacityInput {
+  maxProjects: number;
+}
+
+export interface AcademicBatchDto {
+  id: number;
+  name: string;
+  startYear: number;
+  endYear: number;
+  isCurrent: boolean;
+}
+
+export interface DomainDto {
+  id: string;
+  name: string;
+  description: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface FacultyListItemDto {
+  id: string;
+  name: string;
+  email: string;
+  designation: string;
+  specialization: string;
+  departmentCode: string;
+  remainingCapacity: number;
+}
+
+export interface StudentListItemDto {
+  id: string;
+  name: string;
+  email: string;
+  rollNumber: string;
+  semester: number;
+  departmentCode: string;
+}
+
+export type DocumentType =
+  | 'PROPOSAL'
+  | 'SRS'
+  | 'ARCHITECTURE_DESIGN'
+  | 'MID_TERM_REPORT'
+  | 'FINAL_THESIS'
+  | 'PRESENTATION'
+  | 'SOURCE_CODE_ZIP';
+
+export interface DocumentDto {
+  id: string;
+  projectId: string;
+  uploadedBy: {
+    id: string;
+    fullName: string;
+    role: string;
+    email?: string;
+  };
+  documentType: DocumentType;
+  fileName: string;
+  originalFileName: string;
+  fileSizeBytes: number;
+  fileSizeFormatted: string;
+  mimeType: string;
+  version: number;
+  remarks?: string;
+  milestoneId?: string;
+  uploadedAt: string;
+}
+
+export interface ProjectDocumentsOverviewDto {
+  projectId: string;
+  projectTitle: string;
+  totalDocuments: number;
+  documents: DocumentDto[];
+  latestByType: Partial<Record<DocumentType, DocumentDto>>;
+}
+
+export interface UploadDocumentInput {
+  documentType: DocumentType;
+  remarks?: string;
+  milestoneId?: string;
+}
+
+export interface NotificationDto {
+  id: string;
+  recipientId: string;
+  type: string;
+  title: string;
+  message: string;
+  projectId?: string;
+  proposalId?: string;
+  documentId?: string;
+  reviewId?: string;
+  milestoneId?: string;
+  link?: string;
+  isRead: boolean;
+  readAt?: string;
+  createdAt: string;
+}
+
+export interface PaginatedNotificationsDto {
+  notifications: NotificationDto[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  unreadCount: number;
+}
+
+export interface IRubricCriterionScore {
+  criterionKey: string;
+  label: string;
+  weight: number;
+  score: number;
+  remarks?: string;
+}
+
+export type LetterGrade = 'O' | 'A+' | 'A' | 'B+' | 'B' | 'RA';
+export type EvaluationStatus = 'NOT_STARTED' | 'DRAFT' | 'SUBMITTED';
+
+export interface EvaluationDto {
+  id: string;
+  projectId: string;
+  evaluatorId: string;
+  evaluatorName?: string;
+  evaluatorEmail?: string;
+  status: 'DRAFT' | 'SUBMITTED';
+  rubricScores: IRubricCriterionScore[];
+  totalWeightedScore: number;
+  letterGrade: LetterGrade;
+  generalFeedback: string;
+  recommendations?: string;
+  isPassed: boolean;
+  submittedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface EvaluationEligibilityDto {
+  eligible: boolean;
+  reasons: string[];
+  canEvaluate: boolean;
+  projectStatus: string;
+  overallProgress: number;
+  milestonesCount: number;
+  completedMilestonesCount: number;
+  documentsCount: number;
+  qualifyingDocumentsCount: number;
+  currentEvaluationStatus: EvaluationStatus;
+  standardRubric: IRubricCriterionScore[];
+}
+
+export interface EvaluationResponseDto {
+  evaluation: EvaluationDto | null;
+  status: EvaluationStatus;
+  isReleased: boolean;
+}
 
 

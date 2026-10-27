@@ -10,6 +10,7 @@ import {
 import { withMongoTransaction } from '../db/mongo';
 import { ApiError } from '../utils/ApiError';
 import { logger } from '../utils/logger';
+import { notificationService } from './notification.service';
 import {
   CreateProposalInput,
   UpdateProposalInput,
@@ -45,6 +46,8 @@ export interface ProposalDetail {
   title: string;
   abstract: string;
   domain: string;
+  subjectCode: string;
+  subjectName: string;
   techStack: string[];
   submittedBy: {
     id: string;
@@ -174,6 +177,8 @@ export class ProposalService {
         title: input.title,
         abstract: input.abstract,
         domain: input.domain,
+        subjectCode: input.subjectCode || 'CAPSTONE-01',
+        subjectName: input.subjectName || 'Major Capstone Project',
         techStack: input.techStack || [],
         submittedBy: studentUserId,
         assignedFacultyId: input.assignedFacultyId || undefined,
@@ -298,6 +303,8 @@ export class ProposalService {
       title: prop.title,
       abstract: prop.abstract,
       domain: prop.domain,
+      subjectCode: prop.subjectCode || 'CAPSTONE-01',
+      subjectName: prop.subjectName || 'Major Capstone Project',
       techStack: Array.isArray(prop.techStack) ? prop.techStack : [],
       submittedBy: {
         id: prop.submittedBy,
@@ -394,6 +401,24 @@ export class ProposalService {
       entityId: proposalId,
       details: { newVersion, nextStatus },
     });
+
+    // Notify assigned faculty guide
+    if (prop.assignedFacultyId) {
+      try {
+        const submitter = await User.findById(studentUserId);
+        const submitterName = submitter ? `${submitter.firstName} ${submitter.lastName}`.trim() : 'Student Lead';
+        await notificationService.notifyProposalSubmission({
+          proposalId,
+          title: prop.title,
+          version: newVersion,
+          isResubmission,
+          submitterName,
+          assignedFacultyId: prop.assignedFacultyId,
+        });
+      } catch (err) {
+        logger.error('[ProposalService] Non-fatal notification error on proposal submit:', err);
+      }
+    }
 
     logger.info(`[ProposalService] Proposal ${proposalId} submitted by student ${studentUserId} (Status: ${nextStatus}, v${newVersion})`);
     return this.getProposalById(proposalId);
@@ -528,6 +553,8 @@ export class ProposalService {
           title: propDoc.title,
           abstract: propDoc.abstract,
           domain: propDoc.domain,
+          subjectCode: propDoc.subjectCode || 'CAPSTONE-01',
+          subjectName: propDoc.subjectName || 'Major Capstone Project',
           facultyGuideId: guideId,
           status: 'ALLOCATED',
           overallProgress: 0,
@@ -564,6 +591,26 @@ export class ProposalService {
 
       logger.info(`[ProposalService] Proposal ${proposalId} APPROVED by ${evaluatorUserId}. Instantiated active project ${instantiatedProjectId}`);
       const updatedProp = await this.getProposalById(proposalId);
+
+      // Notify project team students
+      try {
+        const evaluator = await User.findById(evaluatorUserId);
+        const evaluatorName = evaluator ? `${evaluator.firstName} ${evaluator.lastName}`.trim() : 'Faculty Guide';
+        const memberStudentIds = prop.members.map((m) => m.studentId);
+        await notificationService.notifyProposalReview({
+          proposalId,
+          title: prop.title,
+          version: prop.version,
+          status: 'APPROVED',
+          facultyComments: input.facultyComments,
+          memberStudentIds,
+          evaluatorName,
+          projectId: instantiatedProjectId,
+        });
+      } catch (err) {
+        logger.error('[ProposalService] Non-fatal notification error on proposal approval:', err);
+      }
+
       return { proposal: updatedProp, instantiatedProjectId };
     }
 
@@ -582,6 +629,24 @@ export class ProposalService {
       entityId: proposalId,
       details: { comments: input.facultyComments },
     });
+
+    // Notify project team students of changes requested or rejection
+    try {
+      const evaluator = await User.findById(evaluatorUserId);
+      const evaluatorName = evaluator ? `${evaluator.firstName} ${evaluator.lastName}`.trim() : 'Faculty Guide';
+      const memberStudentIds = prop.members.map((m) => m.studentId);
+      await notificationService.notifyProposalReview({
+        proposalId,
+        title: prop.title,
+        version: prop.version,
+        status: input.status,
+        facultyComments: input.facultyComments,
+        memberStudentIds,
+        evaluatorName,
+      });
+    } catch (err) {
+      logger.error('[ProposalService] Non-fatal notification error on proposal review:', err);
+    }
 
     logger.info(`[ProposalService] Proposal ${proposalId} evaluated as ${input.status} by ${evaluatorUserId}`);
     const updatedProp = await this.getProposalById(proposalId);
@@ -747,6 +812,8 @@ export class ProposalService {
       title: project.title,
       abstract: project.abstract,
       domain: project.domain,
+      subjectCode: project.subjectCode || 'CAPSTONE-01',
+      subjectName: project.subjectName || 'Major Capstone Project',
       facultyGuide: {
         id: guide?.id || '',
         name: guide ? `${guide.firstName} ${guide.lastName}` : 'Unassigned',

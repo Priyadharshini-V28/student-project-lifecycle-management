@@ -6,11 +6,22 @@ import {
   Proposal,
   Project,
   Review,
+  Domain,
+  DocumentModel,
+  AuditLog,
+  Notification,
+  Evaluation,
 } from '../models';
 import { logger } from '../utils/logger';
 
 export const seedMongoData = async (): Promise<void> => {
   logger.info('🌱 Seeding MongoDB with complete academic dataset...');
+
+  // Reset Documents, AuditLogs, Notifications, and Evaluations for fresh test run
+  await DocumentModel.deleteMany({});
+  await AuditLog.deleteMany({});
+  await Notification.deleteMany({});
+  await Evaluation.deleteMany({});
 
   // 1. System Settings
   await SystemSetting.deleteMany({});
@@ -31,23 +42,44 @@ export const seedMongoData = async (): Promise<void> => {
     { _id: 3, code: 'ECE', name: 'Department of Electronics & Communication Engineering' },
   ]);
 
-  // 3. Batches
+  // 3. Batches (Dynamic 5 Batches)
   await AcademicBatch.deleteMany({});
   await AcademicBatch.insertMany([
     { _id: 1, departmentId: 1, name: '2022-2026 Batch', startYear: 2022, endYear: 2026, isActive: true },
     { _id: 2, departmentId: 1, name: '2023-2027 Batch', startYear: 2023, endYear: 2027, isActive: true },
+    { _id: 3, departmentId: 1, name: '2024-2028 Batch', startYear: 2024, endYear: 2028, isActive: true },
+    { _id: 4, departmentId: 1, name: '2025-2029 Batch', startYear: 2025, endYear: 2029, isActive: true },
+    { _id: 5, departmentId: 1, name: '2026-2030 Batch', startYear: 2026, endYear: 2030, isActive: true },
   ]);
 
-  // 4. Users (Password@123 hash)
-  const passwordHash = '$2a$10$imEZT27g5odn4W5j9Et/g.hqZhyjq/NskZHGAVMsJ4xZQEIm9lqdS';
+  // 3.1 Project Domains (Dynamic Domains)
+  await Domain.deleteMany({});
+  await Domain.insertMany([
+    { name: 'Artificial Intelligence & Healthcare', description: 'Deep learning for clinical imaging, diagnostics, and pathology detection.', departmentId: 1, isActive: true },
+    { name: 'Natural Language Processing & LLMs', description: 'Transformer architectures, prompt engineering, RAG, and foundation models.', departmentId: 1, isActive: true },
+    { name: 'Computer Vision & Medical Imaging', description: 'Image segmentation, object detection, Vision Transformers, and Grad-CAM.', departmentId: 1, isActive: true },
+    { name: 'Distributed Machine Learning & Federated Learning', description: 'Privacy-preserving edge model training, differential privacy, and decentralized learning.', departmentId: 1, isActive: true },
+    { name: 'Edge AI, Embedded Systems & IoT', description: 'Quantized neural networks on microcontrollers, edge accelerators, and sensor telemetry.', departmentId: 1, isActive: true },
+    { name: 'Generative AI & Multimodal Systems', description: 'Diffusion models, vision-language alignment (CLIP), audio-visual generation.', departmentId: 1, isActive: true },
+    { name: 'Cybersecurity & Threat Detection', description: 'Intrusion detection systems, adversarial robustness, and malware classification.', departmentId: 1, isActive: true },
+    { name: 'Autonomous Robotics & Navigation', description: 'SLAM, reinforcement learning, obstacle avoidance, and robotic control.', departmentId: 1, isActive: true },
+    { name: 'Blockchain & Decentralized Systems', description: 'Smart contracts, decentralized finance, ledger consensus, and identity protocols.', departmentId: 1, isActive: true },
+    { name: 'FinTech & Quantitative Analytics', description: 'Algorithmic trading, credit risk models, fraud detection, and financial timeseries.', departmentId: 1, isActive: true },
+    { name: 'Cloud Computing & Distributed Systems', description: 'Microservices orchestration, Kubernetes, high-concurrency event brokers.', departmentId: 1, isActive: true },
+    { name: 'Internet of Medical Things (IoMT)', description: 'Wearable health telemetry, real-time vital monitoring, and HIPAA compliant streaming.', departmentId: 1, isActive: true },
+  ]);
+
+  // 4. Users (Password@123 hash for demo faculty & students, SPLM@Admin2026 for admin)
+  const passwordHash = '$2a$10$imEZT27g5odn4W5j9Et/g.hqZhyjq/NskZHGAVMsJ4xZQEIm9lqdS'; // Password@123
+  const adminPasswordHash = '$2a$10$0wTIyDg2ogAA2c5tobQkT.mQBjtGJms62HvxwaGMBDTUskIlByvUG'; // SPLM@Admin2026
 
   await User.deleteMany({});
   await User.insertMany([
-    // Admin
+    // Admin (Single Institutional Admin with SPLM@Admin2026)
     {
       _id: 'a0000000-0000-0000-0000-000000000001',
       email: 'admin@splm.edu',
-      passwordHash,
+      passwordHash: adminPasswordHash,
       firstName: 'Dr. Aruna',
       lastName: 'Devi',
       role: 'ADMIN',
@@ -167,6 +199,8 @@ export const seedMongoData = async (): Promise<void> => {
       abstract:
         'This project develops a high-precision multi-stage convolutional neural network coupled with Vision Transformers (ViT) to perform automated fundus retinal image classification and grading. The system generates pixel-level attention heatmaps via Grad-CAM to assist ophthalmologists with interpretable diagnostics.',
       domain: 'Artificial Intelligence & Healthcare',
+      subjectCode: 'CAPSTONE-01',
+      subjectName: 'Major Capstone Project',
       techStack: ['Python', 'PyTorch', 'Vision Transformer', 'FastAPI', 'React', 'Docker'],
       submittedBy: 'b0000000-0000-0000-0000-000000000001',
       assignedFacultyId: 'f0000000-0000-0000-0000-000000000001',
@@ -196,6 +230,8 @@ export const seedMongoData = async (): Promise<void> => {
       abstract:
         'Investigating differential privacy mechanisms within asynchronous federated learning architectures across simulated edge hospital clusters. Ensures zero patient data leakage during global model gradient aggregations.',
       domain: 'Distributed Machine Learning & Cybersecurity',
+      subjectCode: 'CAPSTONE-01',
+      subjectName: 'Major Capstone Project',
       techStack: ['Python', 'TensorFlow Federated', 'PySyft', 'PostgreSQL', 'Docker'],
       submittedBy: 'b0000000-0000-0000-0000-000000000003',
       assignedFacultyId: 'f0000000-0000-0000-0000-000000000002',
@@ -230,6 +266,8 @@ export const seedMongoData = async (): Promise<void> => {
       abstract:
         'This project develops a high-precision multi-stage convolutional neural network coupled with Vision Transformers (ViT) to perform automated fundus retinal image classification and grading. The system generates pixel-level attention heatmaps via Grad-CAM to assist ophthalmologists with interpretable diagnostics.',
       domain: 'Artificial Intelligence & Healthcare',
+      subjectCode: 'CAPSTONE-01',
+      subjectName: 'Major Capstone Project',
       facultyGuideId: 'f0000000-0000-0000-0000-000000000001',
       status: 'IN_PROGRESS',
       overallProgress: 65,

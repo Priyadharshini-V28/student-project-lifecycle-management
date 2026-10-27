@@ -54,7 +54,7 @@ export class UserService {
         rollNumber: user.studentProfile?.rollNumber,
         semester: user.studentProfile?.semester,
         cgpa: user.studentProfile?.cgpa !== undefined ? Number(user.studentProfile.cgpa) : undefined,
-        batchName: batchName || '2022-2026 Batch',
+        batchName: batchName || 'Unassigned Batch',
         employeeId: user.facultyProfile?.employeeId,
         designation: user.facultyProfile?.designation,
         specialization: user.facultyProfile?.specialization,
