@@ -3,12 +3,15 @@ import { authService } from '../services/auth.service';
 import { registerSchema, loginSchema } from '../validators/auth.validator';
 import { env } from '../config/env';
 
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
-  path: '/',
+export const getAuthCookieOptions = () => {
+  const isProd = env.NODE_ENV === 'production' || process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
+    path: '/',
+  };
 };
 
 export const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -17,7 +20,7 @@ export const register = async (req: Request, res: Response, next: NextFunction):
     const { tokens, user } = await authService.register(validatedInput);
 
     // Set refresh token in secure HTTP-only cookie
-    res.cookie('refreshToken', tokens.refreshToken, COOKIE_OPTIONS);
+    res.cookie('refreshToken', tokens.refreshToken, getAuthCookieOptions());
 
     res.status(201).json({
       success: true,
@@ -40,7 +43,7 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
     const { tokens, user } = await authService.login(validatedInput);
 
     // Set refresh token in secure HTTP-only cookie
-    res.cookie('refreshToken', tokens.refreshToken, COOKIE_OPTIONS);
+    res.cookie('refreshToken', tokens.refreshToken, getAuthCookieOptions());
 
     res.status(200).json({
       success: true,
@@ -72,7 +75,7 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     const newTokens = await authService.refreshToken(oldRefreshToken);
 
     // Update cookie with rotated token
-    res.cookie('refreshToken', newTokens.refreshToken, COOKIE_OPTIONS);
+    res.cookie('refreshToken', newTokens.refreshToken, getAuthCookieOptions());
 
     res.status(200).json({
       success: true,
@@ -94,12 +97,7 @@ export const logout = async (req: Request, res: Response, next: NextFunction): P
     await authService.logout(currentRefreshToken);
 
     // Clear refresh cookie
-    res.clearCookie('refreshToken', {
-      httpOnly: true,
-      secure: env.NODE_ENV === 'production',
-      sameSite: 'strict' as const,
-      path: '/',
-    });
+    res.clearCookie('refreshToken', getAuthCookieOptions());
 
     res.status(200).json({
       success: true,
